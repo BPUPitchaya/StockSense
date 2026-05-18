@@ -110,4 +110,38 @@ class ApiService {
       throw Exception('Failed to fetch predictions');
     }
   }
+
+  static Future<void> setBudget(double amount) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/budget'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'amount': amount}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to set budget');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getBudget() async {
+    final response = await http.get(Uri.parse('$baseUrl/budget'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch budget');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getBudgetRecommendations() async {
+    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      throw Exception('No budget set. Please set a budget first.');
+    } else {
+      throw Exception('Failed to fetch budget recommendations');
+    }
+  }
 }

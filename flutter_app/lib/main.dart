@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/signals_screen.dart';
 import 'screens/portfolio_screen.dart';
 import 'screens/predictions_screen.dart';
+import 'screens/budget_screen.dart';
 
 void main() {
   runApp(const StockzApp());
@@ -36,6 +37,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const SignalsScreen(),
     const PredictionsScreen(),
+    const BudgetScreen(),
     const PortfolioScreen(),
   ];
 
@@ -45,6 +47,8 @@ class _MainScreenState extends State<MainScreen> {
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.black54,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
@@ -58,6 +62,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.psychology),
             label: 'Predictions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.attach_money),
+            label: 'Budget',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet),
