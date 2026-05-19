@@ -9,7 +9,9 @@ class PredictionsScreen extends StatefulWidget {
 }
 
 class _PredictionsScreenState extends State<PredictionsScreen> {
-  List<Map<String, dynamic>> predictions = [];
+  Map<String, dynamic> predictionsData = {};
+  List<Map<String, dynamic>> gainers = [];
+  List<Map<String, dynamic>> losers = [];
   bool isLoading = true;
   String? error;
 
@@ -29,7 +31,9 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       final data = await ApiService.getPredictions();
       if (mounted) {
         setState(() {
-          predictions = data;
+          predictionsData = data;
+          gainers = (data['gainers'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+          losers = (data['losers'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
           isLoading = false;
         });
       }
@@ -79,10 +83,6 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   Widget _buildGainersSection() {
-    final gainers = predictions
-        .where((p) => p['prediction'].toString().contains('Buy'))
-        .toList();
-
     if (gainers.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -107,10 +107,6 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   Widget _buildLosersSection() {
-    final losers = predictions
-        .where((p) => p['prediction'].toString().contains('Sell'))
-        .toList();
-
     if (losers.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -135,31 +131,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   Widget _buildHoldSection() {
-    final holds = predictions
-        .where((p) => p['prediction'].toString() == 'Hold')
-        .toList();
-
-    if (holds.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            '⏸️ Hold / Neutral',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-        ),
-        ...holds.map((p) => _buildPredictionCard(p)).toList(),
-      ],
-    );
+    return const SizedBox.shrink(); // No longer needed with new API format
   }
 
   Widget _buildPredictionCard(Map<String, dynamic> prediction) {

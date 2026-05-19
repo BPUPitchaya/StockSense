@@ -2,7 +2,7 @@ class Position {
   final int? id;
   final String ticker;
   final double buyPrice;
-  final int quantity;
+  final double quantity;
   final String date;
   final String? createdAt;
 
@@ -20,7 +20,7 @@ class Position {
       id: json['id'],
       ticker: json['ticker'] ?? '',
       buyPrice: (json['buy_price'] as num).toDouble(),
-      quantity: json['quantity'] ?? 0,
+      quantity: (json['quantity'] as num).toDouble(),
       date: json['date'] ?? '',
       createdAt: json['created_at'],
     );

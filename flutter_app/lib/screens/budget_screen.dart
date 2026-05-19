@@ -202,8 +202,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   Widget _buildRecommendations() {
     final recommendations = _recommendations!;
-    final stockRecommendations = recommendations['recommendations'] as List<dynamic>;
-
+    final stockRecommendations = recommendations['recommendations'] as List<dynamic>? ?? [];
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -219,15 +218,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Total Budget: \$${recommendations['total_budget'].toStringAsFixed(2)}',
+              'Total Budget: \$${(recommendations['total_budget'] ?? 0).toStringAsFixed(2)}',
               style: const TextStyle(fontSize: 16),
             ),
             Text(
-              'Total Allocated: \$${recommendations['total_allocated'].toStringAsFixed(2)}',
+              'Total Allocated: \$${(recommendations['total_allocated'] ?? 0).toStringAsFixed(2)}',
               style: const TextStyle(fontSize: 16, color: Colors.green),
             ),
             Text(
-              'Remaining: \$${recommendations['remaining_budget'].toStringAsFixed(2)}',
+              'Remaining: \$${(recommendations['remaining_budget'] ?? 0).toStringAsFixed(2)}',
               style: const TextStyle(fontSize: 16, color: Colors.orange),
             ),
             const SizedBox(height: 20),

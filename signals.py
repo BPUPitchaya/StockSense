@@ -6,24 +6,19 @@ from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-WATCHLIST = [
-    # Technology
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "INTC", "CSCO",
-    # Financial
-    "JPM", "BAC", "V", "MA", "WFC", "GS", "MS",
-    # Healthcare
-    "JNJ", "UNH", "PFE", "ABBV", "TMO", "LLY", "ABT",
-    # Consumer
-    "WMT", "PG", "KO", "MCD", "HD", "NKE", "COST",
-    # Energy
-    "XOM", "CVX", "COP", "SLB",
-    # Industrial
-    "CAT", "HON", "GE", "RTX", "BA",
-    # ETFs
-    "SPY", "QQQ", "VOO", "IWM",
-    # Other Major
-    "DIS", "NFLX", "PYPL", "ADBE", "CRM", "ORCL"
-]
+# Categorized watchlist for selective loading
+CATEGORIES = {
+    "Technology": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "INTC", "CSCO", "NFLX", "PYPL", "ADBE", "CRM", "ORCL"],
+    "Financial": ["JPM", "BAC", "V", "MA", "WFC", "GS", "MS"],
+    "Healthcare": ["JNJ", "UNH", "PFE", "ABBV", "TMO", "LLY", "ABT"],
+    "Consumer": ["WMT", "PG", "KO", "MCD", "HD", "NKE", "COST", "DIS"],
+    "Energy": ["XOM", "CVX", "COP", "SLB"],
+    "Industrial": ["CAT", "HON", "GE", "RTX", "BA"],
+    "ETFs": ["SPY", "QQQ", "VOO", "IWM"],
+}
+
+# Flat watchlist for backward compatibility
+WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
 
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -567,36 +562,79 @@ def predict_stock(ticker: str) -> Optional[Dict]:
         return None
 
 
-def get_all_predictions() -> List[Dict]:
-    """Get predictions for all watchlist stocks using parallel processing"""
-    predictions = []
+def get_all_signals(category: Optional[str] = None) -> List[Dict]:
+    """Get trading signals for watchlist stocks using parallel processing"""
+    # Use category-specific watchlist if provided
+    target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
     
-    print(f"Predicting {len(WATCHLIST)} stocks in parallel...")
+    signals_data = []
+    
+    print(f"Fetching signals for {len(target_watchlist)} stocks in {category or 'all'} category...")
     
     # Use ThreadPoolExecutor for parallel processing
     with ThreadPoolExecutor(max_workers=10) as executor:
-        # Submit all prediction tasks
         future_to_ticker = {
-            executor.submit(predict_stock, ticker): ticker 
-            for ticker in WATCHLIST
+            executor.submit(analyze_stock, ticker): ticker 
+            for ticker in target_watchlist
         }
         
-        # Collect results as they complete
+        for future in future_to_ticker:
+            ticker = future_to_ticker[future]
+            try:
+                result = future.result()
+                if result:
+                    signals_data.append(result)
+                    print(f"✓ {ticker}")
+            except Exception as e:
+                print(f"✗ {ticker} failed: {e}")
+    
+    print(f"Completed {len(signals_data)} signals")
+    return signals_data
+
+
+def get_all_predictions(category: Optional[str] = None, limit: int = 5) -> List[Dict]:
+    """Get predictions for watchlist stocks using parallel processing"""
+    # Use category-specific watchlist if provided
+    target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
+    
+    predictions = []
+    
+    print(f"Predicting {len(target_watchlist)} stocks in {category or 'all'} category...")
+    
+    # Use ThreadPoolExecutor for parallel processing
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_ticker = {
+            executor.submit(predict_stock, ticker): ticker 
+            for ticker in target_watchlist
+        }
+        
         for future in future_to_ticker:
             ticker = future_to_ticker[future]
             try:
                 result = future.result()
                 if result:
                     predictions.append(result)
-                    print(f"✓ {ticker} completed")
+                    print(f"✓ {ticker}")
             except Exception as e:
                 print(f"✗ {ticker} failed: {e}")
     
     # Sort by score (highest to lowest)
     predictions.sort(key=lambda x: x['score'], reverse=True)
     
-    print(f"Completed {len(predictions)} predictions")
-    return predictions
+    # Separate gainers and losers
+    gainers = [p for p in predictions if p['prediction'] in ['Buy', 'Strong Buy']][:limit]
+    losers = [p for p in predictions if p['prediction'] in ['Sell', 'Strong Sell']][:limit]
+    
+    # Return combined result
+    result = {
+        'gainers': gainers,
+        'losers': losers,
+        'category': category or 'all',
+        'total_analyzed': len(predictions)
+    }
+    
+    print(f"Completed {len(predictions)} predictions. Top {len(gainers)} gainers, {len(losers)} losers")
+    return result
 
 
 if __name__ == "__main__":

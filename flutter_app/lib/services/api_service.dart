@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import '../models/signal.dart';
 import '../models/position.dart';
 import '../models/historical_data.dart';
+import '../config.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000';
+  static String get baseUrl => Config.apiBaseUrl;
 
   static Future<List<Signal>> getSignals() async {
     final response = await http.get(Uri.parse('$baseUrl/signals'));
@@ -100,12 +101,11 @@ class ApiService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getPredictions() async {
+  static Future<Map<String, dynamic>> getPredictions() async {
     final response = await http.get(Uri.parse('$baseUrl/predictions'));
 
     if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((json) => json as Map<String, dynamic>).toList();
+      return json.decode(response.body);
     } else {
       throw Exception('Failed to fetch predictions');
     }
@@ -142,6 +142,28 @@ class ApiService {
       throw Exception('No budget set. Please set a budget first.');
     } else {
       throw Exception('Failed to fetch budget recommendations');
+    }
+  }
+
+  static Future<void> updatePosition(int positionId, Position position) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/portfolio/$positionId'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(position.toJson()),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update position');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getPortfolioValue() async {
+    final response = await http.get(Uri.parse('$baseUrl/portfolio/value'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch portfolio value');
     }
   }
 }

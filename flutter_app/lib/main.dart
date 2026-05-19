@@ -3,6 +3,8 @@ import 'screens/signals_screen.dart';
 import 'screens/portfolio_screen.dart';
 import 'screens/predictions_screen.dart';
 import 'screens/budget_screen.dart';
+import 'screens/settings_screen.dart';
+import 'config.dart';
 
 void main() {
   runApp(const StockzApp());
@@ -39,6 +41,7 @@ class _MainScreenState extends State<MainScreen> {
     const PredictionsScreen(),
     const BudgetScreen(),
     const PortfolioScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -56,11 +59,11 @@ class _MainScreenState extends State<MainScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
+            icon: Icon(Icons.trending_up),
             label: 'Signals',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.psychology),
+            icon: Icon(Icons.analytics),
             label: 'Predictions',
           ),
           BottomNavigationBarItem(
@@ -70,6 +73,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet),
             label: 'Portfolio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
