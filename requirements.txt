@@ -4,3 +4,5 @@ yfinance
 pandas
 numpy
 pydantic
+psycopg2-binary
+sqlalchemy
