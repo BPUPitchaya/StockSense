@@ -331,7 +331,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         title: Text(widget.signal.ticker),
         actions: [
           IconButton(
-            icon: Icon(isInWatchlist ? Icons.star : Icons.star_border),
+            icon: Icon(
+              isInWatchlist ? Icons.star : Icons.star_border,
+              color: isInWatchlist ? Colors.black : null,
+            ),
             onPressed: isInWatchlist ? _removeFromPersonalWatchlist : _addToPersonalWatchlist,
             tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
           ),

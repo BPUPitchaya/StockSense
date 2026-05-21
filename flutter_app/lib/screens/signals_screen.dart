@@ -277,7 +277,10 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 ),
               ),
               IconButton(
-                icon: Icon(isInWatchlist ? Icons.star : Icons.star_border),
+                icon: Icon(
+                  isInWatchlist ? Icons.star : Icons.star_border,
+                  color: isInWatchlist ? Colors.black : null,
+                ),
                 onPressed: () {
                   if (isInWatchlist) {
                     _removeFromPersonalWatchlist(signal.ticker);
