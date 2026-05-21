@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -6,6 +6,8 @@ import database
 import signals
 from datetime import datetime, timedelta
 import time
+import jwt
+import os
 
 app = FastAPI()
 
@@ -20,6 +22,42 @@ app.add_middleware(
 # Simple in-memory cache with 30-minute expiration
 cache_store = {}
 CACHE_DURATION = 1800  # 30 minutes in seconds
+
+# JWT Configuration
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-in-production')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24
+
+def create_jwt_token(user_id: int, email: str) -> str:
+    """Create a JWT token for a user"""
+    payload = {
+        'user_id': user_id,
+        'email': email,
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_jwt_token(token: str) -> Optional[dict]:
+    """Verify a JWT token and return the payload if valid"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+def get_current_user(authorization: str = Header(None)) -> Optional[dict]:
+    """Get the current user from the JWT token in the Authorization header"""
+    if not authorization:
+        return None
+    
+    if not authorization.startswith('Bearer '):
+        return None
+    
+    token = authorization[7:]  # Remove 'Bearer ' prefix
+    payload = verify_jwt_token(token)
+    return payload
 
 def get_cache_key(endpoint: str, **kwargs) -> str:
     """Generate cache key from endpoint and parameters"""
@@ -66,6 +104,17 @@ class Signal(BaseModel):
     signal: str
     date: str
 
+class Budget(BaseModel):
+    amount: float
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
 class HistoricalData(BaseModel):
     date: str
     open: float
@@ -74,9 +123,6 @@ class HistoricalData(BaseModel):
     close: float
     volume: int
 
-class Budget(BaseModel):
-    amount: float
-
 @app.on_event("startup")
 def startup_event():
     database.init_db()
@@ -84,6 +130,31 @@ def startup_event():
 @app.get("/")
 def read_root():
     return {"message": "StockSense API"}
+
+@app.post("/signup")
+def signup(request: SignupRequest):
+    """Register a new user"""
+    try:
+        user_id = database.create_user(request.email, request.password)
+        if user_id is None:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        return {"message": "User created successfully", "user_id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/login")
+def login(request: LoginRequest):
+    """Login a user and return JWT token"""
+    try:
+        user = database.verify_user(request.email, request.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        token = create_jwt_token(user['id'], user['email'])
+        return {"token": token, "user_id": user['id'], "email": user['email']}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/categories")
 def get_categories():
@@ -125,19 +196,21 @@ def get_signals(category: Optional[str] = None):
     return []
 
 @app.get("/portfolio")
-def get_portfolio():
+def get_portfolio(current_user: dict = Depends(get_current_user)):
     """Get all portfolio positions"""
     try:
-        positions = database.get_all_positions()
+        user_id = current_user['user_id'] if current_user else None
+        positions = database.get_all_positions(user_id)
         return positions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/portfolio/value")
-def get_portfolio_value():
+def get_portfolio_value(current_user: dict = Depends(get_current_user)):
     """Get total portfolio value"""
     try:
-        positions = database.get_all_positions()
+        user_id = current_user['user_id'] if current_user else None
+        positions = database.get_all_positions(user_id)
         total_value = 0.0
         for position in positions:
             try:
@@ -151,10 +224,11 @@ def get_portfolio_value():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/portfolio")
-def add_position(position: Position):
+def add_position(position: Position, current_user: dict = Depends(get_current_user)):
     """Add a new position to portfolio"""
     try:
-        database.add_position(position.model_dump())
+        user_id = current_user['user_id'] if current_user else None
+        database.add_position(position.model_dump(), user_id)
         return {"message": "Position added successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -186,31 +260,34 @@ def get_watchlist():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/personal-watchlist")
-def get_personal_watchlist():
+def get_personal_watchlist(current_user: dict = Depends(get_current_user)):
     """Get the user's personal watchlist"""
     try:
-        watchlist = database.get_personal_watchlist()
+        user_id = current_user['user_id'] if current_user else None
+        watchlist = database.get_personal_watchlist(user_id)
         return {"personal_watchlist": watchlist}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/personal-watchlist/{ticker}")
-def add_to_personal_watchlist(ticker: str):
+def add_to_personal_watchlist(ticker: str, current_user: dict = Depends(get_current_user)):
     """Add a stock to the user's personal watchlist"""
     try:
         ticker = ticker.upper()
-        database.add_to_personal_watchlist(ticker)
+        user_id = current_user['user_id'] if current_user else None
+        database.add_to_personal_watchlist(ticker, user_id)
         clear_cache()  # Clear all cache to force fresh predictions
         return {"message": f"Added {ticker} to personal watchlist"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/personal-watchlist/{ticker}")
-def remove_from_personal_watchlist(ticker: str):
+def remove_from_personal_watchlist(ticker: str, current_user: dict = Depends(get_current_user)):
     """Remove a stock from the user's personal watchlist"""
     try:
         ticker = ticker.upper()
-        database.remove_from_personal_watchlist(ticker)
+        user_id = current_user['user_id'] if current_user else None
+        database.remove_from_personal_watchlist(ticker, user_id)
         clear_cache()  # Clear all cache to force fresh predictions
         return {"message": f"Removed {ticker} from personal watchlist"}
     except Exception as e:
