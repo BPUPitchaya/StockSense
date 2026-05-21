@@ -269,12 +269,9 @@ def get_personal_watchlist(user_id: int = None) -> List[str]:
     """Get all stocks in the personal watchlist"""
     session = SessionLocal()
     try:
+        # Return all stocks regardless of user_id for now
+        # This ensures pre-added stocks and user-added stocks both show up
         query = session.query(PersonalWatchlist)
-        if user_id:
-            # Get stocks for this user OR stocks without a user (for backward compatibility)
-            query = query.filter(
-                (PersonalWatchlist.user_id == user_id) | (PersonalWatchlist.user_id == None)
-            )
         watchlist_items = query.all()
         return [item.ticker for item in watchlist_items]
     finally:
