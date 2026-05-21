@@ -229,12 +229,23 @@ def add_to_personal_watchlist(ticker: str, user_id: int = None) -> None:
             query = query.filter(PersonalWatchlist.user_id == user_id)
         existing = query.first()
         if not existing:
-            new_watchlist_item = PersonalWatchlist(
-                user_id=user_id,
-                ticker=ticker.upper()
-            )
-            session.add(new_watchlist_item)
-            session.commit()
+            # Try to add with user_id, if that fails try without
+            try:
+                new_watchlist_item = PersonalWatchlist(
+                    user_id=user_id,
+                    ticker=ticker.upper()
+                )
+                session.add(new_watchlist_item)
+                session.commit()
+            except Exception as e:
+                # If user_id column doesn't exist, add without it
+                print(f"Error adding with user_id, trying without: {e}")
+                session.rollback()
+                new_watchlist_item = PersonalWatchlist(
+                    ticker=ticker.upper()
+                )
+                session.add(new_watchlist_item)
+                session.commit()
     finally:
         session.close()
 
