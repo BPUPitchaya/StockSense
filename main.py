@@ -206,7 +206,7 @@ def get_stock_history(ticker: str, period: str = "3mo"):
 
 @app.get("/info/{ticker}")
 def get_stock_info(ticker: str):
-    """Get stock information with reliable basic data (price, signal, indicators)"""
+    """Get stock information using Finnhub API first, then fallback to cached signals and yfinance"""
     try:
         ticker = ticker.upper()
         cache_key = get_cache_key("info", ticker=ticker)
@@ -214,7 +214,13 @@ def get_stock_info(ticker: str):
         if cached_data:
             return cached_data
         
-        # First try to get from cached signals
+        # First try Finnhub API (most reliable for current price and company info)
+        finnhub_info = signals.get_stock_info_finnhub(ticker)
+        if finnhub_info:
+            set_cache(cache_key, finnhub_info)
+            return finnhub_info
+        
+        # Fallback to cached signals
         signals_cache_key = get_cache_key("signals", category="all")
         cached_signals = get_from_cache(signals_cache_key)
         if cached_signals:
@@ -229,6 +235,7 @@ def get_stock_info(ticker: str):
                         "ma50": float(signal.get("ma50")) if signal.get("ma50") is not None else None,
                         "ma200": float(signal.get("ma200")) if signal.get("ma200") is not None else None,
                         "rsi": float(signal.get("rsi")) if signal.get("rsi") is not None else None,
+                        "source": "cached_signals"
                     }
                     # Add nested indicators if they exist
                     if signal.get("macd"):
@@ -243,7 +250,7 @@ def get_stock_info(ticker: str):
                     set_cache(cache_key, data)
                     return data
         
-        # Fallback to analyze_stock if not in cached signals
+        # Fallback to yfinance analyze_stock if not in cached signals
         try:
             result = signals.analyze_stock(ticker)
             if result:
@@ -256,6 +263,7 @@ def get_stock_info(ticker: str):
                     "ma50": float(result.get("ma50")) if result.get("ma50") is not None else None,
                     "ma200": float(result.get("ma200")) if result.get("ma200") is not None else None,
                     "rsi": float(result.get("rsi")) if result.get("rsi") is not None else None,
+                    "source": "yfinance"
                 }
                 # Add nested indicators if they exist
                 if result.get("macd"):
@@ -278,7 +286,8 @@ def get_stock_info(ticker: str):
             "current_price": None,
             "signal": "NO_DATA",
             "date": None,
-            "error": "Stock data currently unavailable due to rate limiting"
+            "error": "Stock data currently unavailable",
+            "source": "fallback"
         }
         set_cache(cache_key, data)
         return data
@@ -291,7 +300,8 @@ def get_stock_info(ticker: str):
             "current_price": None,
             "signal": "ERROR",
             "date": None,
-            "error": str(e)
+            "error": str(e),
+            "source": "error"
         }
         return data
 

@@ -6,6 +6,8 @@ from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
+import os
+import finnhub
 
 # Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
 CATEGORIES = {
@@ -14,6 +16,10 @@ CATEGORIES = {
 
 # Flat watchlist for backward compatibility
 WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
+
+# Initialize Finnhub client
+FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
+finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -297,6 +303,46 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
     
     print(f"Returning {len(history)} data points")
     return history
+
+
+def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
+    """Get stock information from Finnhub API (more reliable for current price and company info)"""
+    try:
+        # Get quote (current price)
+        quote = finnhub_client.quote(ticker)
+        if not quote or quote.get('c') is None:
+            return None
+        
+        # Get company profile
+        profile = finnhub_client.company_profile2(symbol=ticker)
+        
+        return {
+            'ticker': ticker,
+            'current_price': quote.get('c'),  # Current price
+            'change': quote.get('d'),  # Change
+            'percent_change': quote.get('dp'),  # Percent change
+            'high': quote.get('h'),  # High of the day
+            'low': quote.get('l'),  # Low of the day
+            'open': quote.get('o'),  # Open price
+            'previous_close': quote.get('pc'),  # Previous close
+            'market_cap': profile.get('marketCapitalization') if profile else None,
+            'pe_ratio': profile.get('pe') if profile else None,
+            'dividend_yield': profile.get('dividendYield') if profile else None,
+            'beta': profile.get('beta') if profile else None,
+            'eps': profile.get('eps') if profile else None,
+            'industry': profile.get('industry') if profile else None,
+            'sector': profile.get('sector') if profile else None,
+            'description': profile.get('description') if profile else None,
+            'country': profile.get('country') if profile else None,
+            'exchange': profile.get('exchange') if profile else None,
+            'currency': profile.get('currency') if profile else None,
+            '52_week_high': profile.get('52WeekHigh') if profile else None,
+            '52_week_low': profile.get('52WeekLow') if profile else None,
+            'source': 'finnhub'
+        }
+    except Exception as e:
+        print(f"Error fetching Finnhub info for {ticker}: {e}")
+        return None
 
 
 def get_stock_info(ticker: str) -> Optional[Dict]:
