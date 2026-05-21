@@ -5,14 +5,14 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import time
 
-# Categorized watchlist for selective loading (reduced to avoid rate limiting)
+# Categorized watchlist for selective loading (reduced to 10 stocks to avoid rate limiting)
 CATEGORIES = {
     "Technology": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
-    "Financial": ["JPM", "BAC", "V"],
-    "Healthcare": ["JNJ", "UNH", "PFE"],
-    "Consumer": ["WMT", "PG", "HD"],
+    "Financial": ["JPM", "BAC"],
     "ETFs": ["SPY", "QQQ"],
+    "Healthcare": ["JNJ"],
 }
 
 # Flat watchlist for backward compatibility
@@ -273,6 +273,7 @@ def get_all_signals() -> List[Dict]:
         result = analyze_stock(ticker)
         if result:
             signals.append(result)
+        time.sleep(0.5)  # Add delay to prevent rate limiting
     
     return signals
 
@@ -304,6 +305,7 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
 def get_stock_info(ticker: str) -> Optional[Dict]:
     """Get detailed stock information"""
     try:
+        time.sleep(0.5)  # Add delay to prevent rate limiting
         stock = yf.Ticker(ticker)
         info = stock.info
         
