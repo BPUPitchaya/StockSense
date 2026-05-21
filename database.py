@@ -271,7 +271,10 @@ def get_personal_watchlist(user_id: int = None) -> List[str]:
     try:
         query = session.query(PersonalWatchlist)
         if user_id:
-            query = query.filter(PersonalWatchlist.user_id == user_id)
+            # Get stocks for this user OR stocks without a user (for backward compatibility)
+            query = query.filter(
+                (PersonalWatchlist.user_id == user_id) | (PersonalWatchlist.user_id == None)
+            )
         watchlist_items = query.all()
         return [item.ticker for item in watchlist_items]
     finally:
