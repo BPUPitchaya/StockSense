@@ -7,3 +7,4 @@ pydantic
 psycopg2-binary
 sqlalchemy
 finnhub-python
+PyJWT
