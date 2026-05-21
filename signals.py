@@ -225,30 +225,87 @@ def calculate_indicators(df: pd.DataFrame) -> Dict:
 
 def generate_signal(indicators: Dict) -> str:
     """
-    Generate trading signal based on indicators:
-    - BUY: Price < 50-day MA and RSI < 30 (oversold)
-    - SELL: Price > 50-day MA and RSI > 70 (overbought)
-    - HOLD: No clear signal
+    Generate trading signal based on multiple indicators for better accuracy:
+    - BUY: Multiple bullish indicators (price below MA, oversold RSI, positive MACD, etc.)
+    - SELL: Multiple bearish indicators (price above MA, overbought RSI, negative MACD, etc.)
+    - HOLD: Mixed or unclear signals
     """
     if indicators is None:
         return "NO_DATA"
     
     current_price = indicators['current_price']
     ma50 = indicators['ma50']
+    ma200 = indicators['ma200']
     rsi = indicators['rsi']
+    macd = indicators.get('macd', {})
+    bollinger = indicators.get('bollinger', {})
+    volume = indicators.get('volume', {})
     
     if ma50 is None or rsi is None:
         return "INSUFFICIENT_DATA"
     
-    # BUY signal: Price drops below 50-day MA and RSI is under 30
-    if current_price < ma50 and rsi < 30:
+    # Count bullish and bearish signals
+    bullish_signals = 0
+    bearish_signals = 0
+    
+    # Price vs MA signals
+    if current_price < ma50:
+        bullish_signals += 1
+    elif current_price > ma50:
+        bearish_signals += 1
+    
+    if ma200 and current_price < ma200:
+        bullish_signals += 1
+    elif ma200 and current_price > ma200:
+        bearish_signals += 1
+    
+    # RSI signals
+    if rsi < 30:
+        bullish_signals += 2  # Oversold is strong bullish signal
+    elif rsi < 40:
+        bullish_signals += 1
+    elif rsi > 70:
+        bearish_signals += 2  # Overbought is strong bearish signal
+    elif rsi > 60:
+        bearish_signals += 1
+    
+    # MACD signals
+    if macd:
+        macd_value = macd.get('macd', 0)
+        signal_value = macd.get('signal', 0)
+        if macd_value > signal_value:
+            bullish_signals += 1
+        elif macd_value < signal_value:
+            bearish_signals += 1
+    
+    # Bollinger Bands signals
+    if bollinger:
+        upper = bollinger.get('upper')
+        lower = bollinger.get('lower')
+        if lower and current_price < lower:
+            bullish_signals += 2  # Below lower band is strong buy
+        elif upper and current_price > upper:
+            bearish_signals += 2  # Above upper band is strong sell
+    
+    # Volume trend signals
+    if volume:
+        trend = volume.get('trend')
+        if trend == 'increasing' and current_price < ma50:
+            bullish_signals += 1
+        elif trend == 'increasing' and current_price > ma50:
+            bearish_signals += 1
+    
+    # Generate final signal based on weighted signals
+    if bullish_signals >= 4:
         return "BUY"
-    
-    # SELL signal: Price above 50-day MA and RSI is over 70
-    if current_price > ma50 and rsi > 70:
+    elif bearish_signals >= 4:
         return "SELL"
-    
-    return "HOLD"
+    elif bullish_signals > bearish_signals:
+        return "HOLD"
+    elif bearish_signals > bullish_signals:
+        return "HOLD"
+    else:
+        return "HOLD"
 
 
 def analyze_stock(ticker: str) -> Optional[Dict]:
