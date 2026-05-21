@@ -272,7 +272,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildInfoRow('Market Cap', _formatNumber(info['market_cap'])),
+            _buildInfoRow('Market Cap', _formatNumber(info['market_cap'] * 1e6)),
             _buildInfoRow('P/E Ratio', info['pe_ratio']?.toStringAsFixed(2) ?? 'N/A'),
             _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${(info['dividend_yield'] * 100).toStringAsFixed(2)}%' : 'N/A'),
             _buildInfoRow('Dividend Rate', '\$${info['dividend_rate']?.toStringAsFixed(2) ?? 'N/A'}'),
