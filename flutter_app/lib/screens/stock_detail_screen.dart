@@ -23,7 +23,9 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   bool isInWatchlist = false;
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _buyPriceController = TextEditingController();
+  final TextEditingController _totalAmountController = TextEditingController();
   DateTime? _buyDate;
+  bool _useTotalAmount = false;
 
   @override
   void initState() {
@@ -137,65 +139,130 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     _buyDate = DateTime.now();
     _quantityController.clear();
     _buyPriceController.clear();
+    _totalAmountController.clear();
+    _useTotalAmount = false;
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add ${widget.signal.ticker} to Portfolio'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _quantityController,
-              decoration: const InputDecoration(
-                labelText: 'Quantity',
-                hintText: 'Number of shares',
-                border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Add ${widget.signal.ticker} to Portfolio'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Text('Enter by: '),
+                  Switch(
+                    value: _useTotalAmount,
+                    onChanged: (value) {
+                      setState(() {
+                        _useTotalAmount = value;
+                      });
+                      setDialogState(() {
+                        _useTotalAmount = value;
+                      });
+                    },
+                  ),
+                  Text(_useTotalAmount ? 'Total Amount' : 'Quantity'),
+                ],
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _buyPriceController,
-              decoration: const InputDecoration(
-                labelText: 'Buy Price',
-                hintText: 'Price per share',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              if (_useTotalAmount) ...[
+                TextField(
+                  controller: _totalAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Total Investment Amount',
+                    hintText: 'Total amount spent (e.g., 1000)',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    final total = double.tryParse(value);
+                    final price = double.tryParse(_buyPriceController.text);
+                    if (total != null && price != null && price > 0) {
+                      final calculatedQuantity = total / price;
+                      _quantityController.text = calculatedQuantity.toStringAsFixed(2);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                TextField(
+                  controller: _quantityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    hintText: 'Number of shares',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextField(
+                controller: _buyPriceController,
+                decoration: const InputDecoration(
+                  labelText: 'Buy Price',
+                  hintText: 'Price per share',
+                  border: OutlineInputBorder(),
+                  prefixText: '\$',
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  if (_useTotalAmount) {
+                    final total = double.tryParse(_totalAmountController.text);
+                    final price = double.tryParse(value);
+                    if (total != null && price != null && price > 0) {
+                      final calculatedQuantity = total / price;
+                      _quantityController.text = calculatedQuantity.toStringAsFixed(2);
+                    }
+                  }
+                },
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: Text('Buy Date: ${_buyDate.toString().split(' ')[0]}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _buyDate ?? DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null && mounted) {
-                  setState(() {
-                    _buyDate = picked;
-                  });
-                }
+              if (_useTotalAmount) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Calculated Quantity: ${_quantityController.text} shares',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ListTile(
+                title: Text('Buy Date: ${_buyDate.toString().split(' ')[0]}'),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _buyDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null && mounted) {
+                    setState(() {
+                      _buyDate = picked;
+                    });
+                    setDialogState(() {
+                      _buyDate = picked;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
               },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: _addToPortfolio,
+              child: const Text('Add'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _addToPortfolio,
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
