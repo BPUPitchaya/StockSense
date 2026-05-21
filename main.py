@@ -199,19 +199,26 @@ def get_stock_info(ticker: str):
         # Use reliable search endpoint instead of rate-limited detailed info
         result = signals.analyze_stock(ticker)
         if result:
+            # Convert numpy types to Python native types for JSON serialization
             data = {
                 "ticker": result.get("ticker", ticker),
-                "current_price": result.get("current_price"),
+                "current_price": float(result.get("current_price")) if result.get("current_price") is not None else None,
                 "signal": result.get("signal"),
                 "date": result.get("date"),
-                "ma50": result.get("ma50"),
-                "ma200": result.get("ma200"),
-                "rsi": result.get("rsi"),
-                "macd": result.get("macd"),
-                "bollinger": result.get("bollinger"),
-                "volume": result.get("volume"),
-                "adx": result.get("adx")
+                "ma50": float(result.get("ma50")) if result.get("ma50") is not None else None,
+                "ma200": float(result.get("ma200")) if result.get("ma200") is not None else None,
+                "rsi": float(result.get("rsi")) if result.get("rsi") is not None else None,
             }
+            # Add nested indicators if they exist
+            if result.get("macd"):
+                data["macd"] = {k: float(v) if v is not None else None for k, v in result["macd"].items()}
+            if result.get("bollinger"):
+                data["bollinger"] = {k: float(v) if v is not None else None for k, v in result["bollinger"].items()}
+            if result.get("volume"):
+                data["volume"] = {k: float(v) if v is not None else None for k, v in result["volume"].items()}
+            if result.get("adx"):
+                data["adx"] = {k: float(v) if v is not None else None for k, v in result["adx"].items()}
+            
             set_cache(cache_key, data)
             return data
         
