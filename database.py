@@ -63,7 +63,7 @@ def init_db():
             if 'user_id' not in portfolio_columns:
                 print("Adding user_id column to portfolio table...")
                 with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE portfolio ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                    conn.execute(text("ALTER TABLE portfolio ADD COLUMN user_id INTEGER"))
                     conn.commit()
                 print("user_id column added to portfolio")
         except Exception as e:
@@ -75,7 +75,7 @@ def init_db():
             if 'user_id' not in watchlist_columns:
                 print("Adding user_id column to personal_watchlist table...")
                 with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE personal_watchlist ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                    conn.execute(text("ALTER TABLE personal_watchlist ADD COLUMN user_id INTEGER"))
                     conn.commit()
                 print("user_id column added to personal_watchlist")
         except Exception as e:
