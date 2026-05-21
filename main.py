@@ -196,28 +196,26 @@ def get_stock_info(ticker: str):
         if cached_data:
             return cached_data
         
-        info = signals.get_stock_info(ticker)
-        if info is None:
-            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
+        # Always use search fallback to avoid yfinance rate limiting
+        result = signals.analyze_stock(ticker)
+        if result:
+            data = {
+                "ticker": result.get("ticker", ticker),
+                "current_price": result.get("current_price"),
+                "signal": result.get("signal"),
+                "date": result.get("date"),
+                "ma50": result.get("ma50"),
+                "ma200": result.get("ma200"),
+                "rsi": result.get("rsi"),
+                "fallback": True
+            }
+            set_cache(cache_key, data)
+            return data
         
-        set_cache(cache_key, info)
-        return info
+        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
     except HTTPException:
         raise
     except Exception as e:
-        # Fallback to search endpoint if info fails
-        try:
-            result = signals.analyze_stock(ticker)
-            if result:
-                return {
-                    "ticker": result.get("ticker", ticker),
-                    "current_price": result.get("current_price"),
-                    "signal": result.get("signal"),
-                    "date": result.get("date"),
-                    "fallback": True
-                }
-        except:
-            pass
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
 
 @app.get("/predictions")
