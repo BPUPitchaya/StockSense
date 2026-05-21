@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/signal.dart';
 import '../models/historical_data.dart';
+import '../models/position.dart';
 import '../services/api_service.dart';
 
 class StockDetailScreen extends StatefulWidget {
@@ -20,6 +21,9 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   String? error;
   List<String> personalWatchlist = [];
   bool isInWatchlist = false;
+  final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _buyPriceController = TextEditingController();
+  DateTime? _buyDate;
 
   @override
   void initState() {
@@ -129,6 +133,130 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     }
   }
 
+  void _showAddToPortfolioDialog() {
+    _buyDate = DateTime.now();
+    _quantityController.clear();
+    _buyPriceController.clear();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add ${widget.signal.ticker} to Portfolio'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _quantityController,
+              decoration: const InputDecoration(
+                labelText: 'Quantity',
+                hintText: 'Number of shares',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _buyPriceController,
+              decoration: const InputDecoration(
+                labelText: 'Buy Price',
+                hintText: 'Price per share',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: Text('Buy Date: ${_buyDate.toString().split(' ')[0]}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _buyDate ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null && mounted) {
+                  setState(() {
+                    _buyDate = picked;
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _addToPortfolio,
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addToPortfolio() async {
+    final quantity = double.tryParse(_quantityController.text);
+    final buyPrice = double.tryParse(_buyPriceController.text);
+    
+    if (quantity == null || quantity <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid quantity')),
+        );
+      }
+      return;
+    }
+    
+    if (buyPrice == null || buyPrice <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid buy price')),
+        );
+      }
+      return;
+    }
+    
+    if (_buyDate == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a buy date')),
+        );
+      }
+      return;
+    }
+    
+    try {
+      final position = Position(
+        ticker: widget.signal.ticker,
+        buyPrice: buyPrice,
+        quantity: quantity,
+        date: _buyDate.toString().split(' ')[0],
+      );
+      
+      await ApiService.addPosition(position);
+      
+      Navigator.pop(context);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added ${widget.signal.ticker} to portfolio')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add to portfolio: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,6 +267,11 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             icon: Icon(isInWatchlist ? Icons.star : Icons.star_border),
             onPressed: isInWatchlist ? _removeFromPersonalWatchlist : _addToPersonalWatchlist,
             tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _showAddToPortfolioDialog,
+            tooltip: 'Add to portfolio',
           ),
         ],
       ),
