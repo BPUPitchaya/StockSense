@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/signal.dart';
 import '../models/position.dart';
 import '../models/historical_data.dart';
@@ -8,8 +9,66 @@ import '../config.dart';
 class ApiService {
   static String get baseUrl => Config.apiBaseUrl;
 
+  // Authentication methods
+  static Future<void> _saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('jwt_token', token);
+  }
+
+  static Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('jwt_token');
+  }
+
+  static Future<void> _removeToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt_token');
+  }
+
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email, 'password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      await _saveToken(data['token']);
+      return data;
+    } else {
+      throw Exception('Failed to login: ${response.body}');
+    }
+  }
+
+  static Future<void> signup(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/signup'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email, 'password': password}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to signup: ${response.body}');
+    }
+  }
+
+  static Future<void> logout() async {
+    await _removeToken();
+  }
+
+  static Future<Map<String, String>> _getHeaders() async {
+    final token = await _getToken();
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
   static Future<List<Signal>> getSignals() async {
-    final response = await http.get(Uri.parse('$baseUrl/signals'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/signals'), headers: headers);
 
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
@@ -20,7 +79,8 @@ class ApiService {
   }
 
   static Future<List<Position>> getPortfolio() async {
-    final response = await http.get(Uri.parse('$baseUrl/portfolio'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/portfolio'), headers: headers);
 
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
@@ -31,9 +91,10 @@ class ApiService {
   }
 
   static Future<void> addPosition(Position position) async {
+    final headers = await _getHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/portfolio'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: json.encode(position.toJson()),
     );
 
@@ -43,8 +104,10 @@ class ApiService {
   }
 
   static Future<void> deletePosition(int positionId) async {
+    final headers = await _getHeaders();
     final response = await http.delete(
       Uri.parse('$baseUrl/portfolio/$positionId'),
+      headers: headers,
     );
 
     if (response.statusCode != 200) {
@@ -112,9 +175,10 @@ class ApiService {
   }
 
   static Future<void> setBudget(double amount) async {
+    final headers = await _getHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/budget'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: json.encode({'amount': amount}),
     );
 
@@ -124,10 +188,13 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>?> getBudget() async {
-    final response = await http.get(Uri.parse('$baseUrl/budget'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/budget'), headers: headers);
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
+    } else if (response.statusCode == 404) {
+      return null;
     } else {
       throw Exception('Failed to fetch budget');
     }
@@ -158,7 +225,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getPortfolioValue() async {
-    final response = await http.get(Uri.parse('$baseUrl/portfolio/value'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/portfolio/value'), headers: headers);
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -168,10 +236,14 @@ class ApiService {
   }
 
   static Future<List<String>> getPersonalWatchlist() async {
-    final response = await http.get(Uri.parse('$baseUrl/personal-watchlist'));
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/personal-watchlist'),
+      headers: headers,
+    );
 
     if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
+      final data = json.decode(response.body);
       return List<String>.from(data['personal_watchlist']);
     } else {
       throw Exception('Failed to load personal watchlist');
@@ -179,8 +251,10 @@ class ApiService {
   }
 
   static Future<void> addToPersonalWatchlist(String ticker) async {
+    final headers = await _getHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+      headers: headers,
     );
 
     if (response.statusCode != 200) {
@@ -189,8 +263,10 @@ class ApiService {
   }
 
   static Future<void> removeFromPersonalWatchlist(String ticker) async {
+    final headers = await _getHeaders();
     final response = await http.delete(
       Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+      headers: headers,
     );
 
     if (response.statusCode != 200) {
