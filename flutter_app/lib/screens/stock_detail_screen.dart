@@ -315,19 +315,14 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
 
   String _formatNumber(dynamic value) {
     if (value == null) return 'N/A';
-    if (value is int) {
-      if (value >= 1e9) return '\$${(value / 1e9).toStringAsFixed(2)}B';
-      if (value >= 1e6) return '\$${(value / 1e6).toStringAsFixed(2)}M';
-      if (value >= 1e3) return '\$${(value / 1e3).toStringAsFixed(2)}K';
-      return '\$$value';
-    }
-    if (value is double) {
-      if (value >= 1e9) return '\$${(value / 1e9).toStringAsFixed(2)}B';
-      if (value >= 1e6) return '\$${(value / 1e6).toStringAsFixed(2)}M';
-      if (value >= 1e3) return '\$${(value / 1e3).toStringAsFixed(2)}K';
-      return '\$${value.toStringAsFixed(2)}';
-    }
-    return 'N/A';
+    
+    double numValue = value is int ? value.toDouble() : value;
+    
+    // Finnhub returns market cap in millions, so multiply by 1e6
+    if (numValue < 1e3) return '\$${numValue.toStringAsFixed(2)}';
+    if (numValue < 1e6) return '\$${(numValue / 1e3).toStringAsFixed(2)}K';
+    if (numValue < 1e9) return '\$${(numValue / 1e6).toStringAsFixed(2)}M';
+    return '\$${(numValue / 1e9).toStringAsFixed(2)}B';
   }
 
   Color _getSignalColor(String signal) {
