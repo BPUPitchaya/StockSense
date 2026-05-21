@@ -123,9 +123,13 @@ class HistoricalData(BaseModel):
     close: float
     volume: int
 
-# @app.on_event("startup")
-# def startup_event():
-#     database.init_db()
+@app.on_event("startup")
+async def startup_event():
+    try:
+        database.init_db()
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
+        # Don't block startup if database fails
 
 @app.get("/")
 def read_root():
