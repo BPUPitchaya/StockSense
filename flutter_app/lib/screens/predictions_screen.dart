@@ -14,11 +14,15 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   List<Map<String, dynamic>> losers = [];
   bool isLoading = true;
   String? error;
+  List<String> personalWatchlist = [];
+  bool isLoadingWatchlist = false;
+  TextEditingController tickerController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadPredictions();
+    _loadPersonalWatchlist();
   }
 
   Future<void> _loadPredictions() async {
@@ -47,6 +51,93 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     }
   }
 
+  Future<void> _loadPersonalWatchlist() async {
+    setState(() {
+      isLoadingWatchlist = true;
+    });
+
+    try {
+      final watchlist = await ApiService.getPersonalWatchlist();
+      if (mounted) {
+        setState(() {
+          personalWatchlist = watchlist;
+          isLoadingWatchlist = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingWatchlist = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _addToPersonalWatchlist(String ticker) async {
+    try {
+      await ApiService.addToPersonalWatchlist(ticker);
+      await _loadPersonalWatchlist();
+      await _loadPredictions(); // Reload predictions to use new watchlist
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add $ticker: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeFromPersonalWatchlist(String ticker) async {
+    try {
+      await ApiService.removeFromPersonalWatchlist(ticker);
+      await _loadPersonalWatchlist();
+      await _loadPredictions(); // Reload predictions to use updated watchlist
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove $ticker: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  void _showAddToWatchlistDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add to Personal Watchlist'),
+        content: TextField(
+          controller: tickerController,
+          decoration: const InputDecoration(
+            hintText: 'Enter stock ticker (e.g., AAPL)',
+            border: OutlineInputBorder(),
+          ),
+          textCapitalization: TextCapitalization.characters,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              tickerController.clear();
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final ticker = tickerController.text.trim().toUpperCase();
+              if (ticker.isNotEmpty) {
+                Navigator.pop(context);
+                _addToPersonalWatchlist(ticker);
+                tickerController.clear();
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,12 +164,73 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   onRefresh: _loadPredictions,
                   child: ListView(
                     children: [
+                      _buildPersonalWatchlistSection(),
                       _buildGainersSection(),
                       _buildLosersSection(),
                       _buildHoldSection(),
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildPersonalWatchlistSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '⭐ Personal Watchlist',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _showAddToWatchlistDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Stock'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (isLoadingWatchlist)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (personalWatchlist.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'No stocks in personal watchlist. Add stocks to get personalized predictions.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: personalWatchlist.map((ticker) => Chip(
+                label: Text(ticker),
+                deleteIcon: const Icon(Icons.close),
+                onDeleted: () => _removeFromPersonalWatchlist(ticker),
+                backgroundColor: Colors.blue.shade100,
+              )).toList(),
+            ),
+          ),
+        const Divider(height: 32),
+      ],
     );
   }
 
