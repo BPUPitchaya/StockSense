@@ -17,9 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Simple in-memory cache
+# Simple in-memory cache with 30-minute expiration
 cache_store = {}
-CACHE_DURATION = 300  # 5 minutes in seconds
+CACHE_DURATION = 1800  # 30 minutes in seconds
 
 def get_cache_key(endpoint: str, **kwargs) -> str:
     """Generate cache key from endpoint and parameters"""
@@ -90,12 +90,30 @@ def get_signals(category: Optional[str] = None):
     if cached_data:
         return cached_data
     
+    # Try to fetch fresh data
     try:
-        signals_data = signals.get_all_signals(category=category)
-        set_cache(cache_key, signals_data)
-        return signals_data
+        if category and category in signals.CATEGORIES:
+            stocks = signals.CATEGORIES[category]
+        else:
+            stocks = signals.WATCHLIST
+        
+        all_signals = []
+        for ticker in stocks:
+            result = signals.analyze_stock(ticker)
+            if result:
+                all_signals.append(result)
+        
+        if all_signals:
+            set_cache(cache_key, all_signals)
+            return all_signals
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error fetching fresh signals: {e}")
+    
+    # Return cached data even if expired if fresh fetch fails
+    if cached_data:
+        return cached_data
+    
+    return []
 
 @app.get("/portfolio")
 def get_portfolio():

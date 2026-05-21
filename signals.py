@@ -270,7 +270,7 @@ def get_all_signals() -> List[Dict]:
         result = analyze_stock(ticker)
         if result:
             signals.append(result)
-        time.sleep(0.5)  # Add delay to prevent rate limiting
+        time.sleep(2.0)  # Increase delay to 2 seconds to prevent rate limiting
     
     return signals
 
@@ -302,7 +302,7 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
 def get_stock_info(ticker: str) -> Optional[Dict]:
     """Get detailed stock information"""
     try:
-        time.sleep(0.5)  # Add delay to prevent rate limiting
+        time.sleep(2.0)  # Increase delay to 2 seconds to prevent rate limiting
         stock = yf.Ticker(ticker)
         info = stock.info
         
