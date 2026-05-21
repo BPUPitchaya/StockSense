@@ -761,9 +761,9 @@ def get_all_predictions(category: Optional[str] = None, limit: int = 5) -> List[
     # Sort by score (highest to lowest)
     predictions.sort(key=lambda x: x['score'], reverse=True)
     
-    # Separate gainers and losers by score (top 3 gains, bottom 2 losses)
+    # Separate gainers and losers by score (top 3 gains, bottom 3 losses)
     gainers = predictions[:3]  # Top 3 highest scores
-    losers = predictions[-2:] if len(predictions) >= 2 else predictions  # Bottom 2 lowest scores
+    losers = predictions[-3:] if len(predictions) >= 3 else predictions  # Bottom 3 lowest scores
     
     # Return combined result
     result = {
