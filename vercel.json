@@ -1,0 +1,6 @@
+{
+  "buildCommand": "bash install-flutter.sh && cd flutter_app && flutter build web",
+  "outputDirectory": "flutter_app/build/web",
+  "installCommand": "echo 'No install command needed'",
+  "framework": null
+}
