@@ -191,9 +191,16 @@ def get_stock_info(ticker: str):
     """Get detailed stock information including market cap, P/E ratio, dividends, etc."""
     try:
         ticker = ticker.upper()
+        cache_key = get_cache_key("info", ticker=ticker)
+        cached_data = get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+        
         info = signals.get_stock_info(ticker)
         if info is None:
             raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
+        
+        set_cache(cache_key, info)
         return info
     except HTTPException:
         raise
