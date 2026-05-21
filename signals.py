@@ -304,9 +304,9 @@ def generate_signal(indicators: Dict) -> str:
                 bearish_signals += 1  # Volume + price down = strong sell
     
     # Generate final signal based on weighted signals
-    if bullish_signals >= 3:
+    if bullish_signals >= 2:
         return "BUY"
-    elif bearish_signals >= 3:
+    elif bearish_signals >= 2:
         return "SELL"
     elif bullish_signals > bearish_signals:
         return "HOLD"
