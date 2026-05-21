@@ -80,6 +80,22 @@ def init_db():
                 print("user_id column added to personal_watchlist")
         except Exception as e:
             print(f"Error checking/adding user_id to personal_watchlist: {e}")
+        
+        # Pre-populate personal watchlist with default stocks if empty
+        try:
+            session = SessionLocal()
+            existing_watchlist = session.query(PersonalWatchlist).all()
+            if not existing_watchlist:
+                print("Personal watchlist is empty, pre-populating with default stocks...")
+                default_stocks = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA']
+                for ticker in default_stocks:
+                    new_item = PersonalWatchlist(ticker=ticker.upper())
+                    session.add(new_item)
+                session.commit()
+                print(f"Added {len(default_stocks)} default stocks to personal watchlist")
+            session.close()
+        except Exception as e:
+            print(f"Error pre-populating personal watchlist: {e}")
             
     except Exception as e:
         print(f"Database initialization error: {e}")
@@ -257,7 +273,10 @@ def remove_from_personal_watchlist(ticker: str, user_id: int = None) -> None:
             PersonalWatchlist.ticker == ticker.upper()
         )
         if user_id:
-            query = query.filter(PersonalWatchlist.user_id == user_id)
+            # Remove stocks for this user OR stocks without a user (backward compatibility)
+            query = query.filter(
+                (PersonalWatchlist.user_id == user_id) | (PersonalWatchlist.user_id == None)
+            )
         watchlist_item = query.first()
         if watchlist_item:
             session.delete(watchlist_item)
