@@ -196,7 +196,36 @@ def get_stock_info(ticker: str):
         if cached_data:
             return cached_data
         
-        # Use reliable search endpoint instead of rate-limited detailed info
+        # First try to get from cached signals
+        signals_cache_key = get_cache_key("signals", category="all")
+        cached_signals = get_from_cache(signals_cache_key)
+        if cached_signals:
+            for signal in cached_signals:
+                if signal.get("ticker") == ticker:
+                    # Convert numpy types to Python native types for JSON serialization
+                    data = {
+                        "ticker": signal.get("ticker"),
+                        "current_price": float(signal.get("current_price")) if signal.get("current_price") is not None else None,
+                        "signal": signal.get("signal"),
+                        "date": signal.get("date"),
+                        "ma50": float(signal.get("ma50")) if signal.get("ma50") is not None else None,
+                        "ma200": float(signal.get("ma200")) if signal.get("ma200") is not None else None,
+                        "rsi": float(signal.get("rsi")) if signal.get("rsi") is not None else None,
+                    }
+                    # Add nested indicators if they exist
+                    if signal.get("macd"):
+                        data["macd"] = {k: float(v) if v is not None else None for k, v in signal["macd"].items()}
+                    if signal.get("bollinger"):
+                        data["bollinger"] = {k: float(v) if v is not None else None for k, v in signal["bollinger"].items()}
+                    if signal.get("volume"):
+                        data["volume"] = {k: float(v) if v is not None else None for k, v in signal["volume"].items()}
+                    if signal.get("adx"):
+                        data["adx"] = {k: float(v) if v is not None else None for k, v in signal["adx"].items()}
+                    
+                    set_cache(cache_key, data)
+                    return data
+        
+        # Fallback to analyze_stock if not in cached signals
         result = signals.analyze_stock(ticker)
         if result:
             # Convert numpy types to Python native types for JSON serialization
