@@ -244,32 +244,45 @@ def get_stock_info(ticker: str):
                     return data
         
         # Fallback to analyze_stock if not in cached signals
-        result = signals.analyze_stock(ticker)
-        if result:
-            # Convert numpy types to Python native types for JSON serialization
-            data = {
-                "ticker": result.get("ticker", ticker),
-                "current_price": float(result.get("current_price")) if result.get("current_price") is not None else None,
-                "signal": result.get("signal"),
-                "date": result.get("date"),
-                "ma50": float(result.get("ma50")) if result.get("ma50") is not None else None,
-                "ma200": float(result.get("ma200")) if result.get("ma200") is not None else None,
-                "rsi": float(result.get("rsi")) if result.get("rsi") is not None else None,
-            }
-            # Add nested indicators if they exist
-            if result.get("macd"):
-                data["macd"] = {k: float(v) if v is not None else None for k, v in result["macd"].items()}
-            if result.get("bollinger"):
-                data["bollinger"] = {k: float(v) if v is not None else None for k, v in result["bollinger"].items()}
-            if result.get("volume"):
-                data["volume"] = {k: float(v) if v is not None else None for k, v in result["volume"].items()}
-            if result.get("adx"):
-                data["adx"] = {k: float(v) if v is not None else None for k, v in result["adx"].items()}
-            
-            set_cache(cache_key, data)
-            return data
+        try:
+            result = signals.analyze_stock(ticker)
+            if result:
+                # Convert numpy types to Python native types for JSON serialization
+                data = {
+                    "ticker": result.get("ticker", ticker),
+                    "current_price": float(result.get("current_price")) if result.get("current_price") is not None else None,
+                    "signal": result.get("signal"),
+                    "date": result.get("date"),
+                    "ma50": float(result.get("ma50")) if result.get("ma50") is not None else None,
+                    "ma200": float(result.get("ma200")) if result.get("ma200") is not None else None,
+                    "rsi": float(result.get("rsi")) if result.get("rsi") is not None else None,
+                }
+                # Add nested indicators if they exist
+                if result.get("macd"):
+                    data["macd"] = {k: float(v) if v is not None else None for k, v in result["macd"].items()}
+                if result.get("bollinger"):
+                    data["bollinger"] = {k: float(v) if v is not None else None for k, v in result["bollinger"].items()}
+                if result.get("volume"):
+                    data["volume"] = {k: float(v) if v is not None else None for k, v in result["volume"].items()}
+                if result.get("adx"):
+                    data["adx"] = {k: float(v) if v is not None else None for k, v in result["adx"].items()}
+                
+                set_cache(cache_key, data)
+                return data
+        except Exception as e:
+            print(f"Error analyzing stock {ticker}: {e}")
         
-        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
+        # Final fallback: return minimal data with just ticker
+        data = {
+            "ticker": ticker,
+            "current_price": None,
+            "signal": "NO_DATA",
+            "date": None,
+            "error": "Stock data currently unavailable due to rate limiting"
+        }
+        set_cache(cache_key, data)
+        return data
+        
     except HTTPException:
         raise
     except Exception as e:
