@@ -205,7 +205,20 @@ def get_stock_info(ticker: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching stock info: {str(e)}")
+        # Fallback to search endpoint if info fails
+        try:
+            result = signals.analyze_stock(ticker)
+            if result:
+                return {
+                    "ticker": result.get("ticker", ticker),
+                    "current_price": result.get("current_price"),
+                    "signal": result.get("signal"),
+                    "date": result.get("date"),
+                    "fallback": True
+                }
+        except:
+            pass
+        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
 
 @app.get("/predictions")
 def get_predictions(category: Optional[str] = None, limit: Optional[int] = 5):
