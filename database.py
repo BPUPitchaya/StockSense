@@ -81,21 +81,24 @@ def init_db():
         except Exception as e:
             print(f"Error checking/adding user_id to personal_watchlist: {e}")
         
-        # Pre-populate personal watchlist with default stocks if empty
+        # Ensure default stocks are in personal watchlist
         try:
             session = SessionLocal()
             existing_watchlist = session.query(PersonalWatchlist).all()
-            if not existing_watchlist:
-                print("Personal watchlist is empty, pre-populating with default stocks...")
-                default_stocks = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA']
-                for ticker in default_stocks:
+            existing_tickers = {item.ticker.upper() for item in existing_watchlist}
+            default_stocks = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'TSLA']
+            
+            # Add any missing default stocks
+            for ticker in default_stocks:
+                if ticker.upper() not in existing_tickers:
                     new_item = PersonalWatchlist(ticker=ticker.upper())
                     session.add(new_item)
-                session.commit()
-                print(f"Added {len(default_stocks)} default stocks to personal watchlist")
+            
+            session.commit()
+            print(f"Ensured {len(default_stocks)} default stocks are in personal watchlist")
             session.close()
         except Exception as e:
-            print(f"Error pre-populating personal watchlist: {e}")
+            print(f"Error ensuring default stocks in personal watchlist: {e}")
             
     except Exception as e:
         print(f"Database initialization error: {e}")
