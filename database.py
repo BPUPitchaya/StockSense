@@ -52,6 +52,20 @@ def init_db():
     try:
         Base.metadata.create_all(bind=engine)
         print("Database initialized successfully")
+        
+        # Check if user_id column exists in portfolio table
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        portfolio_columns = [col['name'] for col in inspector.get_columns('portfolio')]
+        watchlist_columns = [col['name'] for col in inspector.get_columns('personal_watchlist')]
+        
+        # If user_id column is missing, recreate tables
+        if 'user_id' not in portfolio_columns or 'user_id' not in watchlist_columns:
+            print("Schema mismatch detected, recreating tables...")
+            Base.metadata.drop_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
+            print("Database tables recreated successfully")
+            
     except Exception as e:
         print(f"Database initialization error: {e}")
         # Try to handle migration issues by dropping and recreating
