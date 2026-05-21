@@ -322,7 +322,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     if (numValue < 1e3) return '\$${numValue.toStringAsFixed(2)}';
     if (numValue < 1e6) return '\$${(numValue / 1e3).toStringAsFixed(2)}K';
     if (numValue < 1e9) return '\$${(numValue / 1e6).toStringAsFixed(2)}M';
-    return '\$${(numValue / 1e9).toStringAsFixed(2)}B';
+    if (numValue < 1e12) return '\$${(numValue / 1e9).toStringAsFixed(2)}B';
+    return '\$${(numValue / 1e12).toStringAsFixed(2)}T';
   }
 
   Color _getSignalColor(String signal) {
