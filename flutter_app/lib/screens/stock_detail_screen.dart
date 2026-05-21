@@ -274,7 +274,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             const SizedBox(height: 16),
             _buildInfoRow('Market Cap', _formatNumber(info['market_cap'])),
             _buildInfoRow('P/E Ratio', info['pe_ratio']?.toStringAsFixed(2) ?? 'N/A'),
-            _buildInfoRow('Dividend Yield', '${(info['dividend_yield'] ?? 0.0 * 100).toStringAsFixed(2)}%'),
+            _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${(info['dividend_yield'] * 100).toStringAsFixed(2)}%' : 'N/A'),
             _buildInfoRow('Dividend Rate', '\$${info['dividend_rate']?.toStringAsFixed(2) ?? 'N/A'}'),
             _buildInfoRow('Beta', info['beta']?.toStringAsFixed(2) ?? 'N/A'),
             _buildInfoRow('EPS', '\$${info['eps']?.toStringAsFixed(2) ?? 'N/A'}'),
@@ -285,6 +285,12 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               _buildInfoRow('Profit Margin', '${(info['profit_margin'] * 100).toStringAsFixed(2)}%'),
             if (info['revenue'] != null)
               _buildInfoRow('Revenue', _formatNumber(info['revenue'])),
+            if (info['industry'] != null)
+              _buildInfoRow('Industry', info['industry']),
+            if (info['sector'] != null)
+              _buildInfoRow('Sector', info['sector']),
+            if (info['description'] != null)
+              _buildInfoRow('Description', info['description']),
           ],
         ),
       ),
