@@ -205,6 +205,43 @@ def remove_from_personal_watchlist(ticker: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/validate-stock/{ticker}")
+def validate_stock(ticker: str):
+    """Validate if a ticker is a valid stock (not ETF) before adding to watchlist"""
+    try:
+        ticker = ticker.upper()
+        # Try to fetch stock info to validate
+        stock_info = signals.analyze_stock(ticker)
+        
+        if stock_info is None:
+            return {
+                "valid": False,
+                "reason": "Stock not found or insufficient data",
+                "is_etf": False
+            }
+        
+        # Check if it's an ETF (ETFs often have different characteristics)
+        # ETFs typically have very high volume and lower volatility
+        current_price = stock_info.get('current_price', 0)
+        avg_volume = stock_info.get('avg_volume', 0)
+        
+        # Simple heuristic: ETFs often have extremely high volume
+        is_likely_etf = avg_volume > 100000000 if avg_volume else False
+        
+        return {
+            "valid": True,
+            "reason": "Valid stock",
+            "is_etf": is_likely_etf,
+            "ticker": ticker,
+            "name": stock_info.get('ticker', ticker)
+        }
+    except Exception as e:
+        return {
+            "valid": False,
+            "reason": f"Validation failed: {str(e)}",
+            "is_etf": False
+        }
+
 @app.get("/search/{ticker}", response_model=Signal)
 def search_stock(ticker: str):
     """Search for a specific stock by ticker"""

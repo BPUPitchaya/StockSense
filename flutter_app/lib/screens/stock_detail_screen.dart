@@ -18,11 +18,14 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   Map<String, dynamic>? stockInfo;
   bool isLoading = true;
   String? error;
+  List<String> personalWatchlist = [];
+  bool isInWatchlist = false;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadPersonalWatchlist();
   }
 
   Future<void> _loadData() async {
@@ -54,11 +57,89 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     }
   }
 
+  Future<void> _loadPersonalWatchlist() async {
+    try {
+      final watchlist = await ApiService.getPersonalWatchlist();
+      if (mounted) {
+        setState(() {
+          personalWatchlist = watchlist;
+          isInWatchlist = watchlist.contains(widget.signal.ticker);
+        });
+      }
+    } catch (e) {
+      // Silently fail - personal watchlist is optional
+    }
+  }
+
+  Future<void> _addToPersonalWatchlist() async {
+    try {
+      final validation = await ApiService.validateStock(widget.signal.ticker);
+      
+      if (!validation['valid']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cannot add: ${validation['reason']}')),
+          );
+        }
+        return;
+      }
+      
+      if (validation['is_etf']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ETFs may not work well with predictions')),
+          );
+        }
+      }
+      
+      await ApiService.addToPersonalWatchlist(widget.signal.ticker);
+      await _loadPersonalWatchlist();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added ${widget.signal.ticker} to personal watchlist')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeFromPersonalWatchlist() async {
+    try {
+      await ApiService.removeFromPersonalWatchlist(widget.signal.ticker);
+      await _loadPersonalWatchlist();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Removed ${widget.signal.ticker} from personal watchlist')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.signal.ticker),
+        actions: [
+          IconButton(
+            icon: Icon(isInWatchlist ? Icons.star : Icons.star_border),
+            onPressed: isInWatchlist ? _removeFromPersonalWatchlist : _addToPersonalWatchlist,
+            tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

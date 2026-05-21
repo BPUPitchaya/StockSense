@@ -197,4 +197,14 @@ class ApiService {
       throw Exception('Failed to remove from personal watchlist');
     }
   }
+
+  static Future<Map<String, dynamic>> validateStock(String ticker) async {
+    final response = await http.get(Uri.parse('$baseUrl/validate-stock/$ticker'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to validate stock');
+    }
+  }
 }

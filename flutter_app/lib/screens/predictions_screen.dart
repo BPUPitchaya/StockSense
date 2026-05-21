@@ -75,6 +75,27 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
 
   Future<void> _addToPersonalWatchlist(String ticker) async {
     try {
+      // Validate stock before adding
+      final validation = await ApiService.validateStock(ticker);
+      
+      if (!validation['valid']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cannot add $ticker: ${validation['reason']}')),
+          );
+        }
+        return;
+      }
+      
+      if (validation['is_etf']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ETFs may not work well with predictions. Add anyway?')),
+          );
+          // For now, we'll still allow adding ETFs but warn the user
+        }
+      }
+      
       await ApiService.addToPersonalWatchlist(ticker);
       await _loadPersonalWatchlist();
       await _loadPredictions(); // Reload predictions to use new watchlist
