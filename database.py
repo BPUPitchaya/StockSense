@@ -53,18 +53,33 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         print("Database initialized successfully")
         
-        # Check if user_id column exists in portfolio table
-        from sqlalchemy import inspect
+        # Check if user_id column exists and add it if missing
+        from sqlalchemy import inspect, text
         inspector = inspect(engine)
-        portfolio_columns = [col['name'] for col in inspector.get_columns('portfolio')]
-        watchlist_columns = [col['name'] for col in inspector.get_columns('personal_watchlist')]
         
-        # If user_id column is missing, recreate tables
-        if 'user_id' not in portfolio_columns or 'user_id' not in watchlist_columns:
-            print("Schema mismatch detected, recreating tables...")
-            Base.metadata.drop_all(bind=engine)
-            Base.metadata.create_all(bind=engine)
-            print("Database tables recreated successfully")
+        # Check portfolio table
+        try:
+            portfolio_columns = [col['name'] for col in inspector.get_columns('portfolio')]
+            if 'user_id' not in portfolio_columns:
+                print("Adding user_id column to portfolio table...")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE portfolio ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                    conn.commit()
+                print("user_id column added to portfolio")
+        except Exception as e:
+            print(f"Error checking/adding user_id to portfolio: {e}")
+        
+        # Check personal_watchlist table
+        try:
+            watchlist_columns = [col['name'] for col in inspector.get_columns('personal_watchlist')]
+            if 'user_id' not in watchlist_columns:
+                print("Adding user_id column to personal_watchlist table...")
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE personal_watchlist ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                    conn.commit()
+                print("user_id column added to personal_watchlist")
+        except Exception as e:
+            print(f"Error checking/adding user_id to personal_watchlist: {e}")
             
     except Exception as e:
         print(f"Database initialization error: {e}")
