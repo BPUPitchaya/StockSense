@@ -373,30 +373,12 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Get company profile
         profile = finnhub_client.company_profile2(symbol=ticker)
         
-        # Get additional metrics from yfinance (fallback for missing fields)
+        # Always call yfinance to get comprehensive data
         yfinance_info = None
-        missing_fields = []
-        
-        # Check which fields are missing from Finnhub
-        if not profile or profile.get('pe') is None:
-            missing_fields.append('pe_ratio')
-        if not profile or profile.get('dividendYield') is None:
-            missing_fields.append('dividend_yield')
-        if not profile or profile.get('beta') is None:
-            missing_fields.append('beta')
-        if not profile or profile.get('eps') is None:
-            missing_fields.append('eps')
-        if not profile or profile.get('52WeekHigh') is None:
-            missing_fields.append('52_week_high')
-        if not profile or profile.get('52WeekLow') is None:
-            missing_fields.append('52_week_low')
-        
-        # Only call yfinance if we have missing fields
-        if missing_fields:
-            try:
-                yfinance_info = get_stock_info(ticker)
-            except Exception as e:
-                print(f"yfinance fallback failed for {ticker}: {e}")
+        try:
+            yfinance_info = get_stock_info(ticker)
+        except Exception as e:
+            print(f"yfinance fallback failed for {ticker}: {e}")
         
         return {
             'ticker': ticker,
@@ -417,9 +399,9 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             '52_week_high': yfinance_info.get('52_week_high') if yfinance_info else profile.get('52WeekHigh') if profile else None,
             '52_week_low': yfinance_info.get('52_week_low') if yfinance_info else profile.get('52WeekLow') if profile else None,
             'profit_margin': yfinance_info.get('profit_margin') if yfinance_info else None,
-            'industry': profile.get('industry') if profile else None,
-            'sector': profile.get('sector') if profile else None,
-            'description': profile.get('description') if profile else None,
+            'industry': profile.get('industry') if profile else (yfinance_info.get('industry') if yfinance_info else None),
+            'sector': profile.get('sector') if profile else (yfinance_info.get('sector') if yfinance_info else None),
+            'description': profile.get('description') if profile else (yfinance_info.get('longBusinessSummary') if yfinance_info else None),
             'country': profile.get('country') if profile else None,
             'exchange': profile.get('exchange') if profile else None,
             'currency': profile.get('currency') if profile else None,
