@@ -283,10 +283,17 @@ def get_stock_info(ticker: str):
         set_cache(cache_key, data)
         return data
         
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
+        print(f"Error in /info endpoint for {ticker}: {e}")
+        # Always return data, never 404
+        data = {
+            "ticker": ticker,
+            "current_price": None,
+            "signal": "ERROR",
+            "date": None,
+            "error": str(e)
+        }
+        return data
 
 @app.get("/predictions")
 def get_predictions(category: Optional[str] = None, limit: Optional[int] = 5):
