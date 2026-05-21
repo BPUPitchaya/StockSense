@@ -124,7 +124,7 @@ class HistoricalData(BaseModel):
     volume: int
 
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     try:
         database.init_db()
     except Exception as e:
