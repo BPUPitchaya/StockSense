@@ -200,7 +200,7 @@ def add_to_personal_watchlist(ticker: str):
     try:
         ticker = ticker.upper()
         database.add_to_personal_watchlist(ticker)
-        clear_cache(prefix="predictions")  # Clear predictions cache
+        clear_cache()  # Clear all cache to force fresh predictions
         return {"message": f"Added {ticker} to personal watchlist"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -211,7 +211,7 @@ def remove_from_personal_watchlist(ticker: str):
     try:
         ticker = ticker.upper()
         database.remove_from_personal_watchlist(ticker)
-        clear_cache(prefix="predictions")  # Clear predictions cache
+        clear_cache()  # Clear all cache to force fresh predictions
         return {"message": f"Removed {ticker} from personal watchlist"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
