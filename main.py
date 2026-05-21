@@ -123,9 +123,9 @@ class HistoricalData(BaseModel):
     close: float
     volume: int
 
-@app.on_event("startup")
-def startup_event():
-    database.init_db()
+# @app.on_event("startup")
+# def startup_event():
+#     database.init_db()
 
 @app.get("/")
 def read_root():
