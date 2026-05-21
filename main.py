@@ -42,6 +42,15 @@ def set_cache(key: str, data: dict):
     """Store data in cache"""
     cache_store[key] = (data, time.time())
 
+def clear_cache(prefix: str = None):
+    """Clear cache entries, optionally by prefix"""
+    if prefix:
+        keys_to_delete = [k for k in cache_store.keys() if k.startswith(prefix)]
+        for key in keys_to_delete:
+            del cache_store[key]
+    else:
+        cache_store.clear()
+
 class Position(BaseModel):
     ticker: str
     buy_price: float
@@ -191,6 +200,7 @@ def add_to_personal_watchlist(ticker: str):
     try:
         ticker = ticker.upper()
         database.add_to_personal_watchlist(ticker)
+        clear_cache(prefix="predictions")  # Clear predictions cache
         return {"message": f"Added {ticker} to personal watchlist"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -201,6 +211,7 @@ def remove_from_personal_watchlist(ticker: str):
     try:
         ticker = ticker.upper()
         database.remove_from_personal_watchlist(ticker)
+        clear_cache(prefix="predictions")  # Clear predictions cache
         return {"message": f"Removed {ticker} from personal watchlist"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -210,6 +221,19 @@ def validate_stock(ticker: str):
     """Validate if a ticker is a valid stock (not ETF) before adding to watchlist"""
     try:
         ticker = ticker.upper()
+        
+        # Common ETF patterns to check
+        etf_patterns = ['QQQ', 'VOO', 'VTI', 'GLD', 'SLV', 'TLT', 'IWM', 'EEM', 'SPY', 'DIA', 'XLF', 'XLE', 'XLK', 'XLU', 'XLV', 'XLY', 'XLP', 'XLB', 'XLRE', 'IWB', 'IVV', 'VT', 'BND', 'AGG', 'VTV', 'VUG', 'VYM', 'VIG', 'VXF', 'VWO', 'VEA', 'VSS', 'VNQ', 'BSV']
+        
+        if ticker in etf_patterns:
+            return {
+                "valid": True,
+                "reason": "Valid stock",
+                "is_etf": True,
+                "ticker": ticker,
+                "name": ticker
+            }
+        
         # Try to fetch stock info to validate
         stock_info = signals.analyze_stock(ticker)
         
