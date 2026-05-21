@@ -17,11 +17,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
   final TextEditingController _searchController = TextEditingController();
   Signal? searchedSignal;
   bool isSearching = false;
+  List<String> personalWatchlist = [];
+  Map<String, bool> inWatchlist = {};
 
   @override
   void initState() {
     super.initState();
     _loadSignals();
+    _loadPersonalWatchlist();
   }
 
   Future<void> _loadSignals() async {
@@ -84,6 +87,78 @@ class _SignalsScreenState extends State<SignalsScreen> {
     setState(() {
       searchedSignal = null;
     });
+  }
+
+  Future<void> _loadPersonalWatchlist() async {
+    try {
+      final watchlist = await ApiService.getPersonalWatchlist();
+      if (mounted) {
+        setState(() {
+          personalWatchlist = watchlist;
+          inWatchlist = {for (var ticker in watchlist) ticker: true};
+        });
+      }
+    } catch (e) {
+      // Silently fail - personal watchlist is optional
+    }
+  }
+
+  Future<void> _addToPersonalWatchlist(String ticker) async {
+    try {
+      final validation = await ApiService.validateStock(ticker);
+      
+      if (!validation['valid']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cannot add $ticker: ${validation['reason']}')),
+          );
+        }
+        return;
+      }
+      
+      if (validation['is_etf']) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ETFs are not supported for predictions')),
+          );
+        }
+        return;
+      }
+      
+      await ApiService.addToPersonalWatchlist(ticker);
+      await _loadPersonalWatchlist();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added $ticker to personal watchlist')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add $ticker: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeFromPersonalWatchlist(String ticker) async {
+    try {
+      await ApiService.removeFromPersonalWatchlist(ticker);
+      await _loadPersonalWatchlist();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Removed $ticker from personal watchlist')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove $ticker: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Color _getSignalColor(String signal) {
@@ -177,6 +252,8 @@ class _SignalsScreenState extends State<SignalsScreen> {
   }
 
   Widget _buildSignalCard(Signal signal) {
+    final isInWatchlist = inWatchlist[signal.ticker] ?? false;
+    
     return Card(
       margin: const EdgeInsets.all(8),
       child: InkWell(
@@ -189,12 +266,28 @@ class _SignalsScreenState extends State<SignalsScreen> {
           );
         },
         child: ListTile(
-          title: Text(
-            signal.ticker,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                signal.ticker,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: Icon(isInWatchlist ? Icons.star : Icons.star_border),
+                onPressed: () {
+                  if (isInWatchlist) {
+                    _removeFromPersonalWatchlist(signal.ticker);
+                  } else {
+                    _addToPersonalWatchlist(signal.ticker);
+                  }
+                },
+                tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+              ),
+            ],
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

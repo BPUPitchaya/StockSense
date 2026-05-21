@@ -84,16 +84,16 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
             SnackBar(content: Text('Cannot add $ticker: ${validation['reason']}')),
           );
         }
-        return;
+        return; // Don't add if invalid
       }
       
       if (validation['is_etf']) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ETFs may not work well with predictions. Add anyway?')),
+            const SnackBar(content: Text('ETFs are not supported for predictions')),
           );
-          // For now, we'll still allow adding ETFs but warn the user
         }
+        return; // Don't add if ETF
       }
       
       await ApiService.addToPersonalWatchlist(ticker);

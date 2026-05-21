@@ -81,15 +81,16 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             SnackBar(content: Text('Cannot add: ${validation['reason']}')),
           );
         }
-        return;
+        return; // Don't add if invalid
       }
       
       if (validation['is_etf']) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ETFs may not work well with predictions')),
+            const SnackBar(content: Text('ETFs are not supported for predictions')),
           );
         }
+        return; // Don't add if ETF
       }
       
       await ApiService.addToPersonalWatchlist(widget.signal.ticker);
