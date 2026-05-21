@@ -723,16 +723,17 @@ def get_all_signals(category: Optional[str] = None) -> List[Dict]:
 
 def get_all_predictions(category: Optional[str] = None, limit: int = 5) -> List[Dict]:
     """Get predictions for watchlist stocks using parallel processing"""
-    # Try to use personal watchlist first, fall back to default watchlist
+    # Combine personal watchlist with default watchlist
     try:
         import database
         personal_watchlist = database.get_personal_watchlist()
-        if personal_watchlist:
-            target_watchlist = personal_watchlist
-            print(f"Using personal watchlist with {len(target_watchlist)} stocks")
-        else:
-            target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
-            print(f"Using default watchlist with {len(target_watchlist)} stocks")
+        default_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
+        
+        # Combine both watchlists and remove duplicates
+        combined_watchlist = list(set(personal_watchlist + default_watchlist))
+        target_watchlist = combined_watchlist if combined_watchlist else default_watchlist
+        
+        print(f"Using combined watchlist with {len(target_watchlist)} stocks (personal: {len(personal_watchlist)}, default: {len(default_watchlist)})")
     except Exception as e:
         print(f"Error fetching personal watchlist, using default: {e}")
         target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
