@@ -188,7 +188,7 @@ def get_stock_history(ticker: str, period: str = "3mo"):
 
 @app.get("/info/{ticker}")
 def get_stock_info(ticker: str):
-    """Get detailed stock information including market cap, P/E ratio, dividends, etc."""
+    """Get stock information with reliable basic data (price, signal, indicators)"""
     try:
         ticker = ticker.upper()
         cache_key = get_cache_key("info", ticker=ticker)
@@ -196,13 +196,7 @@ def get_stock_info(ticker: str):
         if cached_data:
             return cached_data
         
-        # Try to get detailed info from yfinance first
-        info = signals.get_stock_info(ticker)
-        if info:
-            set_cache(cache_key, info)
-            return info
-        
-        # Fallback to search endpoint if detailed info fails
+        # Use reliable search endpoint instead of rate-limited detailed info
         result = signals.analyze_stock(ticker)
         if result:
             data = {
@@ -213,7 +207,10 @@ def get_stock_info(ticker: str):
                 "ma50": result.get("ma50"),
                 "ma200": result.get("ma200"),
                 "rsi": result.get("rsi"),
-                "fallback": True
+                "macd": result.get("macd"),
+                "bollinger": result.get("bollinger"),
+                "volume": result.get("volume"),
+                "adx": result.get("adx")
             }
             set_cache(cache_key, data)
             return data
