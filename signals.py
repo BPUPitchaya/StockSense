@@ -7,9 +7,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 
-# Categorized watchlist for selective loading (8 popular stocks to avoid rate limiting)
+# Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
 CATEGORIES = {
-    "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA", "AMZN", "META", "JPM"],
+    "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
 }
 
 # Flat watchlist for backward compatibility

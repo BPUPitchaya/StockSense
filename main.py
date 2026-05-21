@@ -196,7 +196,13 @@ def get_stock_info(ticker: str):
         if cached_data:
             return cached_data
         
-        # Always use search fallback to avoid yfinance rate limiting
+        # Try to get detailed info from yfinance first
+        info = signals.get_stock_info(ticker)
+        if info:
+            set_cache(cache_key, info)
+            return info
+        
+        # Fallback to search endpoint if detailed info fails
         result = signals.analyze_stock(ticker)
         if result:
             data = {
