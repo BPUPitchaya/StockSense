@@ -373,6 +373,31 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Get company profile
         profile = finnhub_client.company_profile2(symbol=ticker)
         
+        # Get additional metrics from yfinance (fallback for missing fields)
+        yfinance_info = None
+        missing_fields = []
+        
+        # Check which fields are missing from Finnhub
+        if not profile or profile.get('pe') is None:
+            missing_fields.append('pe_ratio')
+        if not profile or profile.get('dividendYield') is None:
+            missing_fields.append('dividend_yield')
+        if not profile or profile.get('beta') is None:
+            missing_fields.append('beta')
+        if not profile or profile.get('eps') is None:
+            missing_fields.append('eps')
+        if not profile or profile.get('52WeekHigh') is None:
+            missing_fields.append('52_week_high')
+        if not profile or profile.get('52WeekLow') is None:
+            missing_fields.append('52_week_low')
+        
+        # Only call yfinance if we have missing fields
+        if missing_fields:
+            try:
+                yfinance_info = get_stock_info(ticker)
+            except Exception as e:
+                print(f"yfinance fallback failed for {ticker}: {e}")
+        
         return {
             'ticker': ticker,
             'current_price': quote.get('c'),  # Current price
@@ -383,15 +408,15 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             'open': quote.get('o'),  # Open price
             'previous_close': quote.get('pc'),  # Previous close
             'market_cap': profile.get('marketCapitalization') if profile else None,
-            'pe_ratio': profile.get('pe') if profile else None,
-            'dividend_yield': profile.get('dividendYield') if profile else None,
-            'dividend_rate': None,  # Finnhub doesn't provide this
-            'beta': profile.get('beta') if profile else None,
-            'eps': profile.get('eps') if profile else None,
-            'avg_volume': None,  # Finnhub doesn't provide this
-            '52_week_high': profile.get('52WeekHigh') if profile else None,
-            '52_week_low': profile.get('52WeekLow') if profile else None,
-            'profit_margin': None,  # Finnhub doesn't provide this
+            'pe_ratio': yfinance_info.get('pe_ratio') if yfinance_info else profile.get('pe') if profile else None,
+            'dividend_yield': yfinance_info.get('dividend_yield') if yfinance_info else profile.get('dividendYield') if profile else None,
+            'dividend_rate': yfinance_info.get('dividend_rate') if yfinance_info else None,
+            'beta': yfinance_info.get('beta') if yfinance_info else profile.get('beta') if profile else None,
+            'eps': yfinance_info.get('eps') if yfinance_info else profile.get('eps') if profile else None,
+            'avg_volume': yfinance_info.get('avg_volume') if yfinance_info else None,
+            '52_week_high': yfinance_info.get('52_week_high') if yfinance_info else profile.get('52WeekHigh') if profile else None,
+            '52_week_low': yfinance_info.get('52_week_low') if yfinance_info else profile.get('52WeekLow') if profile else None,
+            'profit_margin': yfinance_info.get('profit_margin') if yfinance_info else None,
             'industry': profile.get('industry') if profile else None,
             'sector': profile.get('sector') if profile else None,
             'description': profile.get('description') if profile else None,
