@@ -28,6 +28,12 @@ class Budget(Base):
     amount = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class PersonalWatchlist(Base):
+    __tablename__ = 'personal_watchlist'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String, nullable=False, unique=True)
+    added_at = Column(DateTime, default=datetime.utcnow)
+
 def init_db():
     """Initialize the database tables"""
     Base.metadata.create_all(bind=engine)
@@ -116,5 +122,38 @@ def get_budget() -> Optional[Dict]:
                 'created_at': budget.created_at.isoformat() if budget.created_at else None
             }
         return None
+    finally:
+        session.close()
+
+def add_to_personal_watchlist(ticker: str) -> None:
+    """Add a stock to the personal watchlist"""
+    session = SessionLocal()
+    try:
+        # Check if already exists
+        existing = session.query(PersonalWatchlist).filter(PersonalWatchlist.ticker == ticker.upper()).first()
+        if not existing:
+            new_watchlist_item = PersonalWatchlist(ticker=ticker.upper())
+            session.add(new_watchlist_item)
+            session.commit()
+    finally:
+        session.close()
+
+def remove_from_personal_watchlist(ticker: str) -> None:
+    """Remove a stock from the personal watchlist"""
+    session = SessionLocal()
+    try:
+        watchlist_item = session.query(PersonalWatchlist).filter(PersonalWatchlist.ticker == ticker.upper()).first()
+        if watchlist_item:
+            session.delete(watchlist_item)
+            session.commit()
+    finally:
+        session.close()
+
+def get_personal_watchlist() -> List[str]:
+    """Get all stocks in the personal watchlist"""
+    session = SessionLocal()
+    try:
+        watchlist_items = session.query(PersonalWatchlist).all()
+        return [item.ticker for item in watchlist_items]
     finally:
         session.close()

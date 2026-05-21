@@ -166,4 +166,35 @@ class ApiService {
       throw Exception('Failed to fetch portfolio value');
     }
   }
+
+  static Future<List<String>> getPersonalWatchlist() async {
+    final response = await http.get(Uri.parse('$baseUrl/personal-watchlist'));
+
+    if (response.statusCode == 200) {
+      Map<String, dynamic> data = json.decode(response.body);
+      return List<String>.from(data['personal_watchlist']);
+    } else {
+      throw Exception('Failed to load personal watchlist');
+    }
+  }
+
+  static Future<void> addToPersonalWatchlist(String ticker) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add to personal watchlist');
+    }
+  }
+
+  static Future<void> removeFromPersonalWatchlist(String ticker) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to remove from personal watchlist');
+    }
+  }
 }

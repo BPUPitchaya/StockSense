@@ -176,6 +176,35 @@ def get_watchlist():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/personal-watchlist")
+def get_personal_watchlist():
+    """Get the user's personal watchlist"""
+    try:
+        watchlist = database.get_personal_watchlist()
+        return {"personal_watchlist": watchlist}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/personal-watchlist/{ticker}")
+def add_to_personal_watchlist(ticker: str):
+    """Add a stock to the user's personal watchlist"""
+    try:
+        ticker = ticker.upper()
+        database.add_to_personal_watchlist(ticker)
+        return {"message": f"Added {ticker} to personal watchlist"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/personal-watchlist/{ticker}")
+def remove_from_personal_watchlist(ticker: str):
+    """Remove a stock from the user's personal watchlist"""
+    try:
+        ticker = ticker.upper()
+        database.remove_from_personal_watchlist(ticker)
+        return {"message": f"Removed {ticker} from personal watchlist"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/search/{ticker}", response_model=Signal)
 def search_stock(ticker: str):
     """Search for a specific stock by ticker"""
