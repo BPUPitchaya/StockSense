@@ -46,10 +46,21 @@ class PersonalWatchlist(Base):
     added_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", backref="watchlist_items")
 
+
 def init_db():
     """Initialize the database tables"""
-    Base.metadata.create_all(bind=engine)
-    print("Database initialized successfully")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        # Try to handle migration issues by dropping and recreating
+        try:
+            Base.metadata.drop_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
+            print("Database recreated successfully")
+        except Exception as e2:
+            print(f"Database recreation failed: {e2}")
 
 def hash_password(password: str) -> str:
     """Hash a password using SHA256"""
