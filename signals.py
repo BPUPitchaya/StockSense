@@ -6,15 +6,13 @@ from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-# Categorized watchlist for selective loading
+# Categorized watchlist for selective loading (reduced to avoid rate limiting)
 CATEGORIES = {
-    "Technology": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "INTC", "CSCO", "NFLX", "PYPL", "ADBE", "CRM", "ORCL"],
-    "Financial": ["JPM", "BAC", "V", "MA", "WFC", "GS", "MS"],
-    "Healthcare": ["JNJ", "UNH", "PFE", "ABBV", "TMO", "LLY", "ABT"],
-    "Consumer": ["WMT", "PG", "KO", "MCD", "HD", "NKE", "COST", "DIS"],
-    "Energy": ["XOM", "CVX", "COP", "SLB"],
-    "Industrial": ["CAT", "HON", "GE", "RTX", "BA"],
-    "ETFs": ["SPY", "QQQ", "VOO", "IWM"],
+    "Technology": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
+    "Financial": ["JPM", "BAC", "V"],
+    "Healthcare": ["JNJ", "UNH", "PFE"],
+    "Consumer": ["WMT", "PG", "HD"],
+    "ETFs": ["SPY", "QQQ"],
 }
 
 # Flat watchlist for backward compatibility
