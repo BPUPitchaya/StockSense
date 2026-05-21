@@ -373,12 +373,23 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Get company profile
         profile = finnhub_client.company_profile2(symbol=ticker)
         
-        # Always call yfinance to get comprehensive data
+        # Check if Finnhub has comprehensive data
+        has_comprehensive_data = False
+        if profile:
+            # Check if Finnhub provides key financial metrics
+            if (profile.get('pe') is not None or 
+                profile.get('dividendYield') is not None or 
+                profile.get('beta') is not None or 
+                profile.get('eps') is not None):
+                has_comprehensive_data = True
+        
+        # Only call yfinance if Finnhub doesn't have comprehensive data
         yfinance_info = None
-        try:
-            yfinance_info = get_stock_info(ticker)
-        except Exception as e:
-            print(f"yfinance fallback failed for {ticker}: {e}")
+        if not has_comprehensive_data:
+            try:
+                yfinance_info = get_stock_info(ticker)
+            except Exception as e:
+                print(f"yfinance fallback failed for {ticker}: {e}")
         
         return {
             'ticker': ticker,
