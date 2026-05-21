@@ -328,16 +328,19 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             'market_cap': profile.get('marketCapitalization') if profile else None,
             'pe_ratio': profile.get('pe') if profile else None,
             'dividend_yield': profile.get('dividendYield') if profile else None,
+            'dividend_rate': None,  # Finnhub doesn't provide this
             'beta': profile.get('beta') if profile else None,
             'eps': profile.get('eps') if profile else None,
+            'avg_volume': None,  # Finnhub doesn't provide this
+            '52_week_high': profile.get('52WeekHigh') if profile else None,
+            '52_week_low': profile.get('52WeekLow') if profile else None,
+            'profit_margin': None,  # Finnhub doesn't provide this
             'industry': profile.get('industry') if profile else None,
             'sector': profile.get('sector') if profile else None,
             'description': profile.get('description') if profile else None,
             'country': profile.get('country') if profile else None,
             'exchange': profile.get('exchange') if profile else None,
             'currency': profile.get('currency') if profile else None,
-            '52_week_high': profile.get('52WeekHigh') if profile else None,
-            '52_week_low': profile.get('52WeekLow') if profile else None,
             'source': 'finnhub'
         }
     except Exception as e:
