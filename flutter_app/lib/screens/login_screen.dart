@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           });
           
           // Navigate to home screen on successful login
-          Navigator.pushReplacementNamed(context, '/');
+          Navigator.pushReplacementNamed(context, '/home');
         }
       }
     } catch (e) {
