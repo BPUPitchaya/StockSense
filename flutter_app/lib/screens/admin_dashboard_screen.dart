@@ -165,7 +165,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       // Popular Stocks
                       _buildSection(
                         'Popular Stocks',
-                        _statistics['popular_stocks']?.isEmpty ?? true
+                        (_statistics['popular_stocks'] as List?)?.isEmpty ?? true
                             ? const Center(child: Text('No stocks data'))
                             : ListView.builder(
                                 shrinkWrap: true,
@@ -175,8 +175,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   final stock = _statistics['popular_stocks'][index];
                                   return ListTile(
                                     leading: const Icon(Icons.trending_up),
-                                    title: Text(stock['ticker']),
-                                    trailing: Text('${stock['count']} users'),
+                                    title: Text(stock['ticker'] ?? 'Unknown'),
+                                    trailing: Text('${stock['count'] ?? 0} users'),
                                   );
                                 },
                               ),
@@ -185,7 +185,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       // Recent Signups
                       _buildSection(
                         'Recent Signups',
-                        _statistics['recent_signups']?.isEmpty ?? true
+                        (_statistics['recent_signups'] as List?)?.isEmpty ?? true
                             ? const Center(child: Text('No recent signups'))
                             : ListView.builder(
                                 shrinkWrap: true,
@@ -195,9 +195,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   final user = _statistics['recent_signups'][index];
                                   return ListTile(
                                     leading: CircleAvatar(
-                                      child: Text(user['id'].toString()),
+                                      child: Text(user['id']?.toString() ?? '?'),
                                     ),
-                                    title: Text(user['email']),
+                                    title: Text(user['email'] ?? 'Unknown'),
                                     subtitle: Text('Created: ${user['created_at']?.substring(0, 10) ?? 'N/A'}'),
                                   );
                                 },

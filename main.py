@@ -237,6 +237,30 @@ def get_predictions(category: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/info/{ticker}")
+def get_stock_info(ticker: str):
+    """Get stock info"""
+    try:
+        stock_data = signals.get_stock_data(ticker)
+        if stock_data:
+            return stock_data
+        else:
+            raise HTTPException(status_code=404, detail="Stock not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/history/{ticker}")
+def get_stock_history(ticker: str, period: str = "3mo"):
+    """Get stock history"""
+    try:
+        history = signals.get_stock_history(ticker, period)
+        if history:
+            return history
+        else:
+            raise HTTPException(status_code=404, detail="History not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/portfolio")
 def add_position(position: Position, authorization: str = Header(...)):
     """Add a position to portfolio"""
@@ -349,14 +373,17 @@ def get_budget(authorization: str = Header(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class BudgetRequest(BaseModel):
+    amount: float
+
 @app.post("/budget")
-def set_budget(amount: float, authorization: str = Header(...)):
+def set_budget(budget: BudgetRequest, authorization: str = Header(...)):
     """Set budget"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        success = database.set_budget(amount, user_id=user_id)
+        success = database.set_budget(budget.amount, user_id=user_id)
         if success:
             return {"message": "Budget set successfully"}
         else:

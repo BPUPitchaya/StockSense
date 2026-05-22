@@ -6,6 +6,8 @@ import 'screens/budget_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/admin_login_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
 import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
@@ -31,6 +33,8 @@ class StockzApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
         '/home': (context) => const MainScreen(),
+        '/admin-login': (context) => const AdminLoginScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
       },
     );
   }
