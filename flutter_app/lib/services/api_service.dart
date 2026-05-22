@@ -1,30 +1,28 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/signal.dart';
-import '../models/position.dart';
-import '../models/historical_data.dart';
-import '../config.dart';
+import 'config.dart';
 
 class ApiService {
-  static String get baseUrl => Config.apiBaseUrl;
+  static String baseUrl = Config.apiBaseUrl;
 
-  // Authentication methods
+  // Token management
   static Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('jwt_token', token);
+    await prefs.setString('auth_token', token);
   }
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('jwt_token');
+    return prefs.getString('auth_token');
   }
 
   static Future<void> _removeToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
+    await prefs.remove('auth_token');
   }
 
+  // Authentication
   static Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/login'),
@@ -34,27 +32,72 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      await _saveToken(data['token']);
+      await _saveToken(data['access_token']);
       return data;
     } else {
-      throw Exception('Failed to login: ${response.body}');
+      throw Exception('Login failed: ${response.body}');
     }
   }
 
-  static Future<void> signup(String email, String password) async {
+  static Future<Map<String, dynamic>> signup(String email, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/signup'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({'email': email, 'password': password}),
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to signup: ${response.body}');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Signup failed: ${response.body}');
     }
   }
 
   static Future<void> logout() async {
     await _removeToken();
+  }
+
+  // Admin methods
+  static Future<Map<String, dynamic>> adminLogin(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email, 'password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Admin login failed: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAllUsers() async {
+    final response = await http.get(Uri.parse('$baseUrl/admin/users'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get users: ${response.body}');
+    }
+  }
+
+  static Future<void> deleteUser(int userId) async {
+    final response = await http.delete(Uri.parse('$baseUrl/admin/users/$userId'));
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete user: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAdminStatistics() async {
+    final response = await http.get(Uri.parse('$baseUrl/admin/statistics'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get admin statistics: ${response.body}');
+    }
   }
 
   static Future<Map<String, String>> _getHeaders() async {
@@ -71,35 +114,36 @@ class ApiService {
     final response = await http.get(Uri.parse('$baseUrl/signals'), headers: headers);
 
     if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
+      final List<dynamic> data = json.decode(response.body);
       return data.map((json) => Signal.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load signals');
+      throw Exception('Failed to get signals: ${response.body}');
     }
   }
 
-  static Future<List<Position>> getPortfolio() async {
-    final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl/portfolio'), headers: headers);
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((json) => Position.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load portfolio');
-    }
-  }
-
-  static Future<void> addPosition(Position position) async {
+  static Future<Map<String, dynamic>> addPosition(Map<String, dynamic> position) async {
     final headers = await _getHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/portfolio'),
       headers: headers,
-      body: json.encode(position.toJson()),
+      body: json.encode(position),
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to add position');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to add position: ${response.body}');
+    }
+  }
+
+  static Future<List<dynamic>> getPortfolio() async {
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/portfolio'), headers: headers);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['positions'];
+    } else {
+      throw Exception('Failed to get portfolio: ${response.body}');
     }
   }
 
@@ -111,66 +155,27 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to delete position');
+      throw Exception('Failed to delete position: ${response.body}');
     }
   }
 
-  static Future<List<String>> getWatchlist() async {
-    final response = await http.get(Uri.parse('$baseUrl/watchlist'));
-
-    if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
-      return List<String>.from(data['watchlist']);
-    } else {
-      throw Exception('Failed to load watchlist');
+  static Future<double> getPortfolioValue() async {
+    final positions = await getPortfolio();
+    double totalValue = 0;
+    for (var pos in positions) {
+      totalValue += pos['buy_price'] * pos['quantity'];
     }
+    return totalValue;
   }
 
-  static Future<Signal> searchStock(String ticker) async {
-    final response = await http.get(Uri.parse('$baseUrl/search/$ticker'));
+  static Future<double> getBudget() async {
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/budget'), headers: headers);
 
     if (response.statusCode == 200) {
-      Map<String, dynamic> data = json.decode(response.body);
-      return Signal.fromJson(data);
-    } else if (response.statusCode == 404) {
-      throw Exception('Stock not found or insufficient data');
+      return json.decode(response.body)['budget'].toDouble();
     } else {
-      throw Exception('Failed to search stock');
-    }
-  }
-
-  static Future<List<HistoricalData>> getStockHistory(String ticker, String period) async {
-    final response = await http.get(Uri.parse('$baseUrl/history/$ticker?period=$period'));
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((json) => HistoricalData.fromJson(json)).toList();
-    } else if (response.statusCode == 404) {
-      throw Exception('Stock not found or insufficient data');
-    } else {
-      throw Exception('Failed to fetch stock history');
-    }
-  }
-
-  static Future<Map<String, dynamic>> getStockInfo(String ticker) async {
-    final response = await http.get(Uri.parse('$baseUrl/info/$ticker'));
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else if (response.statusCode == 404) {
-      throw Exception('Stock not found or insufficient data');
-    } else {
-      throw Exception('Failed to fetch stock info');
-    }
-  }
-
-  static Future<Map<String, dynamic>> getPredictions() async {
-    final response = await http.get(Uri.parse('$baseUrl/predictions'));
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to fetch predictions');
+      throw Exception('Failed to get budget: ${response.body}');
     }
   }
 
@@ -183,104 +188,72 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to set budget');
+      throw Exception('Failed to set budget: ${response.body}');
     }
   }
 
-  static Future<Map<String, dynamic>?> getBudget() async {
+  static Future<List<String>> getWatchlist() async {
     final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl/budget'), headers: headers);
+    final response = await http.get(Uri.parse('$baseUrl/watchlist'), headers: headers);
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else if (response.statusCode == 404) {
-      return null;
+      return List<String>.from(json.decode(response.body)['watchlist']);
     } else {
-      throw Exception('Failed to fetch budget');
+      throw Exception('Failed to get watchlist: ${response.body}');
     }
   }
 
-  static Future<Map<String, dynamic>> getBudgetRecommendations() async {
-    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'));
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else if (response.statusCode == 404) {
-      throw Exception('No budget set. Please set a budget first.');
-    } else {
-      throw Exception('Failed to fetch budget recommendations');
-    }
-  }
-
-  static Future<void> updatePosition(int positionId, Position position) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/portfolio/$positionId'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(position.toJson()),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to update position');
-    }
-  }
-
-  static Future<Map<String, dynamic>> getPortfolioValue() async {
-    final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl/portfolio/value'), headers: headers);
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to fetch portfolio value');
-    }
-  }
-
-  static Future<List<String>> getPersonalWatchlist() async {
-    final headers = await _getHeaders();
-    final response = await http.get(
-      Uri.parse('$baseUrl/personal-watchlist'),
-      headers: headers,
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return List<String>.from(data['personal_watchlist']);
-    } else {
-      throw Exception('Failed to load personal watchlist');
-    }
-  }
-
-  static Future<void> addToPersonalWatchlist(String ticker) async {
+  static Future<void> addToWatchlist(String ticker) async {
     final headers = await _getHeaders();
     final response = await http.post(
-      Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+      Uri.parse('$baseUrl/watchlist'),
       headers: headers,
+      body: json.encode({'ticker': ticker}),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to add to personal watchlist');
+      throw Exception('Failed to add to watchlist: ${response.body}');
     }
   }
 
-  static Future<void> removeFromPersonalWatchlist(String ticker) async {
+  static Future<void> removeFromWatchlist(String ticker) async {
     final headers = await _getHeaders();
     final response = await http.delete(
-      Uri.parse('$baseUrl/personal-watchlist/$ticker'),
+      Uri.parse('$baseUrl/watchlist/$ticker'),
       headers: headers,
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to remove from personal watchlist');
+      throw Exception('Failed to remove from watchlist: ${response.body}');
     }
   }
+}
 
-  static Future<Map<String, dynamic>> validateStock(String ticker) async {
-    final response = await http.get(Uri.parse('$baseUrl/validate-stock/$ticker'));
+class Signal {
+  final String ticker;
+  final String prediction;
+  final double confidence;
+  final double score;
+  final double potentialChange;
+  final String? category;
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to validate stock');
-    }
+  Signal({
+    required this.ticker,
+    required this.prediction,
+    required this.confidence,
+    required this.score,
+    required this.potentialChange,
+    this.category,
+  });
+
+  factory Signal.fromJson(Map<String, dynamic> json) {
+    return Signal(
+      ticker: json['ticker'],
+      prediction: json['prediction'],
+      confidence: json['confidence'].toDouble(),
+      score: json['score'].toDouble(),
+      potentialChange: json['potential_change'].toDouble(),
+      category: json['category'],
+    );
   }
 }

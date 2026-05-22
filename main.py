@@ -1,7 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, CORSMiddleware, BaseModel, List, Optional
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, Any
 import database
 import signals
 from datetime import datetime, timedelta
@@ -11,6 +10,7 @@ import os
 
 app = FastAPI()
 
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,144 +19,171 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Simple in-memory cache with 30-minute expiration
-cache_store = {}
-CACHE_DURATION = 1800  # 30 minutes in seconds
+# JWT Secret
+JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+JWT_ALGORITHM = "HS256"
 
-# JWT Configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_HOURS = 24
+def create_jwt_token(data: dict) -> str:
+    """Create a JWT token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
 
-def create_jwt_token(user_id: int, email: str) -> str:
-    """Create a JWT token for a user"""
-    payload = {
-        'user_id': user_id,
-        'email': email,
-        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def verify_jwt_token(token: str) -> Optional[dict]:
-    """Verify a JWT token and return the payload if valid"""
+def verify_jwt_token(authorization: str = Header(...)) -> dict:
+    """Verify JWT token and return payload"""
     try:
+        token = authorization.replace("Bearer ", "")
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
-        return None
+        raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
-        return None
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_current_user(authorization: str = Header(None)) -> Optional[dict]:
-    """Get the current user from the JWT token in the Authorization header"""
-    if not authorization:
-        return None
-    
-    if not authorization.startswith('Bearer '):
-        return None
-    
-    token = authorization[7:]  # Remove 'Bearer ' prefix
-    payload = verify_jwt_token(token)
-    return payload
-
-def get_cache_key(endpoint: str, **kwargs) -> str:
-    """Generate cache key from endpoint and parameters"""
-    key_parts = [endpoint]
-    for k, v in sorted(kwargs.items()):
-        key_parts.append(f"{k}={v}")
-    return "|".join(key_parts)
-
-def get_from_cache(key: str) -> Optional[dict]:
-    """Get data from cache if not expired"""
-    if key in cache_store:
-        data, timestamp = cache_store[key]
-        if time.time() - timestamp < CACHE_DURATION:
-            return data
-        else:
-            del cache_store[key]
-    return None
-
-def set_cache(key: str, data: dict):
-    """Store data in cache"""
-    cache_store[key] = (data, time.time())
-
-def clear_cache(prefix: str = None):
-    """Clear cache entries, optionally by prefix"""
-    if prefix:
-        keys_to_delete = [k for k in cache_store.keys() if k.startswith(prefix)]
-        for key in keys_to_delete:
-            del cache_store[key]
-    else:
-        cache_store.clear()
-
-class Position(BaseModel):
-    ticker: str
-    buy_price: float
-    quantity: float
-    date: str
-
-class Signal(BaseModel):
-    ticker: str
-    current_price: float
-    ma50: Optional[float]
-    ma200: Optional[float]
-    rsi: Optional[float]
-    signal: str
-    date: str
-
-class Budget(BaseModel):
-    amount: float
+# Pydantic models
+class SignupRequest(BaseModel):
+    email: str
+    password: str
 
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-class SignupRequest(BaseModel):
-    email: str
-    password: str
+class Position(BaseModel):
+    ticker: str
+    buy_price: float
+    quantity: float
+    date: Optional[str] = None
 
-class HistoricalData(BaseModel):
-    date: str
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
+class Signal(BaseModel):
+    ticker: str
+    prediction: str
+    confidence: float
+    score: float
+    potential_change: float
+    category: Optional[str] = None
+
+# Simple in-memory cache
+cache: Dict[str, tuple] = {}
+CACHE_DURATION = 300  # 5 minutes
+
+def get_cache_key(prefix: str, **kwargs) -> str:
+    """Generate a cache key"""
+    key_parts = [prefix]
+    for k, v in sorted(kwargs.items()):
+        key_parts.append(f"{k}={v}")
+    return ":".join(key_parts)
+
+def get_from_cache(key: str) -> Optional[Any]:
+    """Get data from cache if still valid"""
+    if key in cache:
+        data, timestamp = cache[key]
+        if time.time() - timestamp < CACHE_DURATION:
+            return data
+        else:
+            del cache[key]
+    return None
+
+def set_cache(key: str, data: Any) -> None:
+    """Set data in cache"""
+    cache[key] = (data, time.time())
 
 @app.on_event("startup")
 def startup_event():
-    try:
-        database.init_db()
-    except Exception as e:
-        print(f"Database initialization failed: {e}")
-        # Don't block startup if database fails
+    """Initialize database on startup"""
+    database.init_db()
 
 @app.get("/")
 def read_root():
-    return {"message": "StockSense API"}
+    return {"message": "StockSense API is running"}
 
 @app.post("/signup")
 def signup(request: SignupRequest):
-    """Register a new user"""
+    """User signup endpoint"""
     try:
-        user_id = database.create_user(request.email, request.password)
-        if user_id is None:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        return {"message": "User created successfully", "user_id": user_id}
+        success = database.create_user(request.email, request.password)
+        if success:
+            return {"message": "User created successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="User already exists")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/login")
 def login(request: LoginRequest):
-    """Login a user and return JWT token"""
+    """User login endpoint"""
     try:
         user = database.verify_user(request.email, request.password)
-        if not user:
+        if user:
+            token = create_jwt_token({"sub": user['email'], "user_id": user['id']})
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "user": user
+            }
+        else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        token = create_jwt_token(user['id'], user['email'])
-        return {"token": token, "user_id": user['id'], "email": user['email']}
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/login")
+def admin_login(request: LoginRequest):
+    """Admin login endpoint"""
+    try:
+        if database.verify_admin(request.email, request.password):
+            return {"message": "Admin login successful", "email": request.email}
+        else:
+            raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/users")
+def get_all_users():
+    """Get all users (admin only)"""
+    try:
+        return database.get_all_users()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: int):
+    """Delete a user (admin only)"""
+    try:
+        success = database.delete_user(user_id)
+        if success:
+            return {"message": "User deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/statistics")
+def get_admin_statistics():
+    """Get admin dashboard statistics"""
+    try:
+        user_stats = database.get_user_statistics()
+        popular_stocks = database.get_popular_stocks()
+        portfolio_stats = database.get_total_portfolio_value()
+        recent_signups = database.get_recent_signups()
+        system_info = database.get_system_info()
+        
+        return {
+            "user_statistics": user_stats,
+            "popular_stocks": popular_stocks,
+            "portfolio_statistics": portfolio_stats,
+            "recent_signups": recent_signups,
+            "system_info": system_info,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -170,398 +197,140 @@ def get_signals(category: Optional[str] = None):
     """Get trading signals for watchlist stocks"""
     cache_key = get_cache_key("signals", category=category or "all")
     cached_data = get_from_cache(cache_key)
-    
     if cached_data:
         return cached_data
     
-    # Try to fetch fresh data
     try:
-        if category and category in signals.CATEGORIES:
-            stocks = signals.CATEGORIES[category]
-        else:
-            stocks = signals.WATCHLIST
-        
-        all_signals = []
-        for ticker in stocks:
-            result = signals.analyze_stock(ticker)
-            if result:
-                all_signals.append(result)
-        
-        if all_signals:
-            set_cache(cache_key, all_signals)
-            return all_signals
-    except Exception as e:
-        print(f"Error fetching fresh signals: {e}")
-    
-    # Return cached data even if expired if fresh fetch fails
-    if cached_data:
-        return cached_data
-    
-    return []
-
-@app.get("/portfolio")
-def get_portfolio(current_user: dict = Depends(get_current_user)):
-    """Get all portfolio positions"""
-    try:
-        user_id = current_user['user_id'] if current_user else None
-        positions = database.get_all_positions(user_id)
-        return positions
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/portfolio/value")
-def get_portfolio_value(current_user: dict = Depends(get_current_user)):
-    """Get total portfolio value"""
-    try:
-        user_id = current_user['user_id'] if current_user else None
-        positions = database.get_all_positions(user_id)
-        total_value = 0.0
-        for position in positions:
-            try:
-                stock_info = signals.analyze_stock(position['ticker'])
-                if stock_info and 'current_price' in stock_info:
-                    total_value += stock_info['current_price'] * position['quantity']
-            except:
-                pass
-        return {"total_value": total_value, "position_count": len(positions)}
+        predictions = signals.get_all_predictions(category=category)
+        set_cache(cache_key, predictions)
+        return predictions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/portfolio")
-def add_position(position: Position, current_user: dict = Depends(get_current_user)):
-    """Add a new position to portfolio"""
+def add_position(position: Position, authorization: str = Header(...)):
+    """Add a position to portfolio"""
     try:
-        user_id = current_user['user_id'] if current_user else None
-        database.add_position(position.model_dump(), user_id)
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        position_data = position.dict()
+        if position.date:
+            position_data['date'] = datetime.fromisoformat(position.date)
+        else:
+            position_data['date'] = datetime.utcnow()
+        
+        database.add_position(position_data, user_id=user_id)
         return {"message": "Position added successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/portfolio")
+def get_portfolio(authorization: str = Header(...)):
+    """Get portfolio positions"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        positions = database.get_all_positions(user_id=user_id)
+        return {"positions": positions}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/portfolio/{position_id}")
-def delete_position(position_id: int):
+def delete_position(position_id: int, authorization: str = Header(...)):
     """Delete a position from portfolio"""
     try:
-        database.delete_position(position_id)
-        return {"message": "Position deleted successfully"}
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.delete_position(position_id)
+        if success:
+            return {"message": "Position deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Position not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/portfolio/{position_id}")
-def update_position(position_id: int, position: Position):
-    """Update a position in portfolio"""
+@app.post("/watchlist")
+def add_to_watchlist(ticker: str, authorization: str = Header(...)):
+    """Add a stock to personal watchlist"""
     try:
-        database.update_position(position_id, position.model_dump())
-        return {"message": "Position updated successfully"}
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.add_to_watchlist(ticker, user_id=user_id)
+        if success:
+            return {"message": "Stock added to watchlist"}
+        else:
+            raise HTTPException(status_code=400, detail="Stock already in watchlist")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/watchlist")
-def get_watchlist():
-    """Get the current watchlist"""
+def get_watchlist(authorization: str = Header(...)):
+    """Get personal watchlist"""
     try:
-        return {"watchlist": signals.WATCHLIST}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/personal-watchlist")
-def get_personal_watchlist(current_user: dict = Depends(get_current_user)):
-    """Get the user's personal watchlist"""
-    try:
-        user_id = current_user['user_id'] if current_user else None
-        watchlist = database.get_personal_watchlist(user_id)
-        return {"personal_watchlist": watchlist}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/personal-watchlist/{ticker}")
-def add_to_personal_watchlist(ticker: str, current_user: dict = Depends(get_current_user)):
-    """Add a stock to the user's personal watchlist"""
-    try:
-        ticker = ticker.upper()
-        user_id = current_user['user_id'] if current_user else None
-        database.add_to_personal_watchlist(ticker, user_id)
-        clear_cache()  # Clear all cache to force fresh predictions
-        return {"message": f"Added {ticker} to personal watchlist"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/personal-watchlist/{ticker}")
-def remove_from_personal_watchlist(ticker: str, current_user: dict = Depends(get_current_user)):
-    """Remove a stock from the user's personal watchlist"""
-    try:
-        ticker = ticker.upper()
-        user_id = current_user['user_id'] if current_user else None
-        database.remove_from_personal_watchlist(ticker, user_id)
-        clear_cache()  # Clear all cache to force fresh predictions
-        return {"message": f"Removed {ticker} from personal watchlist"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/validate-stock/{ticker}")
-def validate_stock(ticker: str):
-    """Validate if a ticker is a valid stock (not ETF) before adding to watchlist"""
-    try:
-        ticker = ticker.upper()
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
         
-        # Common ETF patterns to check
-        etf_patterns = ['QQQ', 'VOO', 'VTI', 'GLD', 'SLV', 'TLT', 'IWM', 'EEM', 'SPY', 'DIA', 'XLF', 'XLE', 'XLK', 'XLU', 'XLV', 'XLY', 'XLP', 'XLB', 'XLRE', 'IWB', 'IVV', 'VT', 'BND', 'AGG', 'VTV', 'VUG', 'VYM', 'VIG', 'VXF', 'VWO', 'VEA', 'VSS', 'VNQ', 'BSV']
-        
-        if ticker in etf_patterns:
-            return {
-                "valid": True,
-                "reason": "Valid stock",
-                "is_etf": True,
-                "ticker": ticker,
-                "name": ticker
-            }
-        
-        # Try to fetch stock info to validate
-        stock_info = signals.analyze_stock(ticker)
-        
-        if stock_info is None:
-            return {
-                "valid": False,
-                "reason": "Stock not found or insufficient data",
-                "is_etf": False
-            }
-        
-        # Check if it's an ETF (ETFs often have different characteristics)
-        # ETFs typically have very high volume and lower volatility
-        current_price = stock_info.get('current_price', 0)
-        avg_volume = stock_info.get('avg_volume', 0)
-        
-        # Simple heuristic: ETFs often have extremely high volume
-        is_likely_etf = avg_volume > 100000000 if avg_volume else False
-        
-        return {
-            "valid": True,
-            "reason": "Valid stock",
-            "is_etf": is_likely_etf,
-            "ticker": ticker,
-            "name": stock_info.get('ticker', ticker)
-        }
-    except Exception as e:
-        return {
-            "valid": False,
-            "reason": f"Validation failed: {str(e)}",
-            "is_etf": False
-        }
-
-@app.get("/search/{ticker}", response_model=Signal)
-def search_stock(ticker: str):
-    """Search for a specific stock by ticker"""
-    try:
-        ticker = ticker.upper()
-        result = signals.analyze_stock(ticker)
-        if result is None:
-            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
-        return result
+        watchlist = database.get_personal_watchlist(user_id=user_id)
+        return {"watchlist": watchlist}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error searching stock: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/history/{ticker}")
-def get_stock_history(ticker: str, period: str = "3mo"):
-    """Get historical price data for a specific stock"""
+@app.delete("/watchlist/{ticker}")
+def remove_from_watchlist(ticker: str, authorization: str = Header(...)):
+    """Remove a stock from personal watchlist"""
     try:
-        ticker = ticker.upper()
-        history = signals.get_stock_history(ticker, period)
-        if history is None or len(history) == 0:
-            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found or insufficient data")
-        return history
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.remove_from_watchlist(ticker, user_id=user_id)
+        if success:
+            return {"message": "Stock removed from watchlist"}
+        else:
+            raise HTTPException(status_code=404, detail="Stock not in watchlist")
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching stock history: {str(e)}")
-
-@app.get("/info/{ticker}")
-def get_stock_info(ticker: str):
-    """Get stock information using Finnhub API first, then fallback to cached signals and yfinance"""
-    try:
-        ticker = ticker.upper()
-        cache_key = get_cache_key("info", ticker=ticker)
-        cached_data = get_from_cache(cache_key)
-        if cached_data:
-            return cached_data
-        
-        # First try Finnhub API (most reliable for current price and company info)
-        finnhub_info = signals.get_stock_info_finnhub(ticker)
-        if finnhub_info:
-            set_cache(cache_key, finnhub_info)
-            return finnhub_info
-        
-        # Fallback to cached signals
-        signals_cache_key = get_cache_key("signals", category="all")
-        cached_signals = get_from_cache(signals_cache_key)
-        if cached_signals:
-            for signal in cached_signals:
-                if signal.get("ticker") == ticker:
-                    # Convert numpy types to Python native types for JSON serialization
-                    data = {
-                        "ticker": signal.get("ticker"),
-                        "current_price": float(signal.get("current_price")) if signal.get("current_price") is not None else None,
-                        "signal": signal.get("signal"),
-                        "date": signal.get("date"),
-                        "ma50": float(signal.get("ma50")) if signal.get("ma50") is not None else None,
-                        "ma200": float(signal.get("ma200")) if signal.get("ma200") is not None else None,
-                        "rsi": float(signal.get("rsi")) if signal.get("rsi") is not None else None,
-                        "source": "cached_signals"
-                    }
-                    # Add nested indicators if they exist
-                    if signal.get("macd"):
-                        data["macd"] = {k: float(v) if v is not None else None for k, v in signal["macd"].items()}
-                    if signal.get("bollinger"):
-                        data["bollinger"] = {k: float(v) if v is not None else None for k, v in signal["bollinger"].items()}
-                    if signal.get("volume"):
-                        data["volume"] = {k: float(v) if v is not None else None for k, v in signal["volume"].items()}
-                    if signal.get("adx"):
-                        data["adx"] = {k: float(v) if v is not None else None for k, v in signal["adx"].items()}
-                    
-                    set_cache(cache_key, data)
-                    return data
-        
-        # Fallback to yfinance analyze_stock if not in cached signals
-        try:
-            result = signals.analyze_stock(ticker)
-            if result:
-                # Convert numpy types to Python native types for JSON serialization
-                data = {
-                    "ticker": result.get("ticker", ticker),
-                    "current_price": float(result.get("current_price")) if result.get("current_price") is not None else None,
-                    "signal": result.get("signal"),
-                    "date": result.get("date"),
-                    "ma50": float(result.get("ma50")) if result.get("ma50") is not None else None,
-                    "ma200": float(result.get("ma200")) if result.get("ma200") is not None else None,
-                    "rsi": float(result.get("rsi")) if result.get("rsi") is not None else None,
-                    "source": "yfinance"
-                }
-                # Add nested indicators if they exist
-                if result.get("macd"):
-                    data["macd"] = {k: float(v) if v is not None else None for k, v in result["macd"].items()}
-                if result.get("bollinger"):
-                    data["bollinger"] = {k: float(v) if v is not None else None for k, v in result["bollinger"].items()}
-                if result.get("volume"):
-                    data["volume"] = {k: float(v) if v is not None else None for k, v in result["volume"].items()}
-                if result.get("adx"):
-                    data["adx"] = {k: float(v) if v is not None else None for k, v in result["adx"].items()}
-                
-                set_cache(cache_key, data)
-                return data
-        except Exception as e:
-            print(f"Error analyzing stock {ticker}: {e}")
-        
-        # Final fallback: return minimal data with just ticker
-        data = {
-            "ticker": ticker,
-            "current_price": None,
-            "signal": "NO_DATA",
-            "date": None,
-            "error": "Stock data currently unavailable",
-            "source": "fallback"
-        }
-        set_cache(cache_key, data)
-        return data
-        
-    except Exception as e:
-        print(f"Error in /info endpoint for {ticker}: {e}")
-        # Always return data, never 404
-        data = {
-            "ticker": ticker,
-            "current_price": None,
-            "signal": "ERROR",
-            "date": None,
-            "error": str(e),
-            "source": "error"
-        }
-        return data
-
-@app.get("/predictions")
-def get_predictions(category: Optional[str] = None, limit: Optional[int] = 5):
-    """Get predictions for watchlist stocks (top N gainers and losers)"""
-    cache_key = get_cache_key("predictions", category=category or "all", limit=limit)
-    cached_data = get_from_cache(cache_key)
-    
-    if cached_data:
-        return cached_data
-    
-    try:
-        predictions = signals.get_all_predictions(category=category, limit=limit)
-        set_cache(cache_key, predictions)
-        return predictions
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching predictions: {str(e)}")
-
-@app.post("/budget")
-def set_budget(budget: Budget):
-    """Set the budget amount"""
-    try:
-        database.set_budget(budget.amount)
-        return {"message": "Budget set successfully", "amount": budget.amount}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/budget")
-def get_budget():
-    """Get the current budget"""
+def get_budget(authorization: str = Header(...)):
+    """Get budget"""
     try:
-        budget = database.get_budget()
-        if budget is None:
-            raise HTTPException(status_code=404, detail="No budget set")
-        return budget
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        budget = database.get_budget(user_id=user_id)
+        return {"budget": budget}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/budget-recommendations")
-def get_budget_recommendations():
-    """Get budget recommendations based on portfolio and predictions"""
+@app.post("/budget")
+def set_budget(amount: float, authorization: str = Header(...)):
+    """Set budget"""
     try:
-        budget = database.get_budget()
-        if budget is None:
-            raise HTTPException(status_code=404, detail="No budget set")
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
         
-        # Get top predictions
-        predictions = signals.get_all_predictions(limit=5)
-        top_gainers = predictions.get('gainers', [])
-        
-        budget_amount = budget['amount']
-        recommendations = []
-        total_allocated = 0
-        
-        # Allocate budget evenly among top gainers
-        if top_gainers:
-            allocation_per_stock = budget_amount / len(top_gainers)
-            
-            for prediction in top_gainers:
-                price = prediction.get('current_price', 0)
-                if price > 0:
-                    shares = allocation_per_stock / price
-                    actual_amount = shares * price
-                    total_allocated += actual_amount
-                    
-                    recommendations.append({
-                        'ticker': prediction['ticker'],
-                        'prediction': prediction.get('prediction', 'Buy'),
-                        'current_price': price,
-                        'shares': shares,
-                        'actual_amount': actual_amount,
-                        'allocation_percentage': (actual_amount / budget_amount) * 100,
-                        'confidence': prediction.get('confidence', 0),
-                        'score': prediction.get('score', 0),
-                        'potential_change': prediction.get('potential_change'),
-                        'factors': prediction.get('factors', [])
-                    })
-        
-        return {
-            'total_budget': budget_amount,
-            'total_allocated': total_allocated,
-            'remaining_budget': budget_amount - total_allocated,
-            'message': f'Market is {"bullish" if len(top_gainers) >= 3 else "neutral" if len(top_gainers) >= 1 else "bearish"}',
-            'market_condition': 'bullish' if len(top_gainers) >= 3 else 'neutral' if len(top_gainers) >= 1 else 'bearish',
-            'recommendations': recommendations
-        }
+        success = database.set_budget(amount, user_id=user_id)
+        if success:
+            return {"message": "Budget set successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to set budget")
     except HTTPException:
         raise
     except Exception as e:
@@ -569,10 +338,4 @@ def get_budget_recommendations():
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    
-    # Configure host from environment variable or default to localhost
-    host = os.getenv("HOST", "127.0.0.1")
-    port = int(os.getenv("PORT", "8000"))
-    
-    uvicorn.run(app, host=host, port=port)# Force redeploy
+    uvicorn.run(app, host="0.0.0.0", port=8000)

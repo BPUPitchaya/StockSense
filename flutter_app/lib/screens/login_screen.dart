@@ -21,18 +21,35 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response = await ApiService.login(
-        _emailController.text,
-        _passwordController.text,
-      );
-
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+      // Check if admin credentials
+      if (_emailController.text == 'admin@admin.com' && _passwordController.text == '1234') {
+        // Admin login
+        final response = await ApiService.adminLogin(
+          _emailController.text,
+          _passwordController.text,
+        );
         
-        // Navigate to home screen on successful login
-        Navigator.pushReplacementNamed(context, '/');
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+          Navigator.pushReplacementNamed(context, '/admin-dashboard');
+        }
+      } else {
+        // Normal user login
+        final response = await ApiService.login(
+          _emailController.text,
+          _passwordController.text,
+        );
+
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+          
+          // Navigate to home screen on successful login
+          Navigator.pushReplacementNamed(context, '/');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -123,6 +140,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.pushNamed(context, '/signup');
                     },
                     child: const Text("Don't have an account? Sign up"),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/admin-login');
+                    },
+                    child: const Text(
+                      'Admin Access',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
                 ],
               ),
