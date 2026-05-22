@@ -505,9 +505,9 @@ def predict_stock(ticker: str) -> Optional[Dict]:
         weekly_analysis = analyze_timeframe(weekly_df, 'weekly')
         monthly_analysis = analyze_timeframe(monthly_df, 'monthly')
         
-        # Trend strength filter: Only predict if ADX > 20 (strong enough trend)
+        # Trend strength filter: Only predict if ADX > 10 (relaxed threshold)
         adx_value = adx.get('adx')
-        if adx_value is None or adx_value < 20:
+        if adx_value is None or adx_value < 10:
             return {
                 'ticker': ticker,
                 'prediction': 'Hold',

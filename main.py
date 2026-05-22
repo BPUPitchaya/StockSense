@@ -419,7 +419,7 @@ def get_budget_recommendations(authorization: str = Header(...)):
         
         # Get predictions for watchlist stocks
         all_signals = []
-        for ticker in watchlist[:5]:  # Limit to top 5
+        for ticker in watchlist[:10]:  # Check up to 10 stocks
             try:
                 pred = signals.predict_stock(ticker)
                 if pred and pred.get('prediction') in ['Buy', 'Strong Buy']:
@@ -431,7 +431,7 @@ def get_budget_recommendations(authorization: str = Header(...)):
         all_signals.sort(key=lambda x: x.get('score', 0), reverse=True)
         
         # Calculate allocations
-        top_picks = all_signals[:3]  # Top 3 picks
+        top_picks = all_signals[:5]  # Top 5 picks
         total_score = sum(s.get('score', 1) for s in top_picks) or 1
         
         stock_recommendations = []
