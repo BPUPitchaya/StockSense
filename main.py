@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, CORSMiddleware, BaseModel, List, Optional
+from fastapi import FastAPI, HTTPException, Depends, Header, BaseModel, List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 import database
