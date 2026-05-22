@@ -242,8 +242,9 @@ def get_stock_info(ticker: str):
     """Get stock info"""
     try:
         stock_data = signals.get_stock_data(ticker)
-        if stock_data:
-            return stock_data
+        if stock_data is not None:
+            # Convert DataFrame to dict
+            return stock_data.to_dict(orient='records')
         else:
             raise HTTPException(status_code=404, detail="Stock not found")
     except Exception as e:
@@ -368,6 +369,30 @@ def get_budget(authorization: str = Header(...)):
         
         budget = database.get_budget(user_id=user_id)
         return {"budget": budget}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/budget-recommendations")
+def get_budget_recommendations(authorization: str = Header(...)):
+    """Get budget recommendations"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        budget = database.get_budget(user_id=user_id)
+        # Simple recommendation logic
+        if budget <= 0:
+            return {"recommendations": ["Set a budget to get recommendations"]}
+        
+        recommendations = [
+            rf"Your weekly budget is ${budget:.2f}",
+            "Consider diversifying across 3-5 stocks",
+            "Keep 20% of budget as cash reserve",
+            "Review portfolio weekly"
+        ]
+        return {"recommendations": recommendations}
     except HTTPException:
         raise
     except Exception as e:
