@@ -55,7 +55,7 @@ class _AuthCheckerState extends State<AuthChecker> {
 
   Future<void> _checkAuth() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
+    final token = prefs.getString('auth_token');
     
     if (mounted) {
       setState(() {
