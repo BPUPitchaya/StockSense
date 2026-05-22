@@ -223,28 +223,37 @@ def get_signals(category: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predictions")
-def get_predictions(category: Optional[str] = None):
-    """Get all predictions with gainers and losers"""
-    cache_key = get_cache_key("predictions", category=category or "all")
-    cached_data = get_from_cache(cache_key)
-    if cached_data:
-        return cached_data
-    
+def get_predictions(category: Optional[str] = None, authorization: str = Header(...)):
+    """Get all predictions with gainers and losers for the user's watchlist"""
     try:
-        predictions = signals.get_all_predictions(category=category)
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        # Get user's watchlist
+        watchlist = database.get_watchlist(user_id=user_id)
+        if not watchlist:
+            watchlist = signals.get_default_watchlist()
+        
+        # Use watchlist in cache key to make it user-specific
+        watchlist_key = ",".join(sorted(watchlist))
+        cache_key = get_cache_key("predictions", category=category or "all", watchlist=watchlist_key[:50])
+        cached_data = get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+        
+        predictions = signals.get_all_predictions(category=category, watchlist=watchlist)
         set_cache(cache_key, predictions)
         return predictions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/info/{ticker}")
-def get_stock_info(ticker: str):
-    """Get stock info"""
+def get_stock_info_endpoint(ticker: str):
+    """Get stock info with market cap, P/E ratio, etc."""
     try:
-        stock_data = signals.get_stock_data(ticker)
-        if stock_data is not None:
-            # Convert DataFrame to dict
-            return stock_data.to_dict(orient='records')
+        stock_info = signals.get_stock_info(ticker)
+        if stock_info is not None:
+            return stock_info
         else:
             raise HTTPException(status_code=404, detail="Stock not found")
     except Exception as e:
@@ -375,27 +384,76 @@ def get_budget(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/budget-recommendations")
-def get_budget_recommendations(authorization: Optional[str] = Header(None)):
-    """Get budget recommendations"""
+def get_budget_recommendations(authorization: str = Header(...)):
+    """Get budget recommendations with stock allocations"""
     try:
-        if authorization:
-            payload = verify_jwt_token(authorization)
-            user_id = payload.get("user_id")
-            budget = database.get_budget(user_id=user_id)
-        else:
-            budget = 0.0
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        budget = database.get_budget(user_id=user_id)
         
-        # Simple recommendation logic
         if budget <= 0:
-            return {"recommendations": ["Set a budget to get recommendations"]}
+            return {
+                "total_budget": 0.0,
+                "total_allocated": 0.0,
+                "remaining_budget": 0.0,
+                "recommendations": [],
+                "message": "Please set a budget to get recommendations"
+            }
         
-        recommendations = [
-            rf"Your weekly budget is ${budget:.2f}",
-            "Consider diversifying across 3-5 stocks",
-            "Keep 20% of budget as cash reserve",
-            "Review portfolio weekly"
-        ]
-        return {"recommendations": recommendations}
+        # Get watchlist
+        watchlist = database.get_watchlist(user_id=user_id)
+        if not watchlist:
+            watchlist = signals.get_default_watchlist()
+        
+        # Get predictions for watchlist stocks
+        all_signals = []
+        for ticker in watchlist[:5]:  # Limit to top 5
+            try:
+                pred = signals.get_prediction(ticker)
+                if pred and pred.get('prediction') in ['Buy', 'Strong Buy']:
+                    all_signals.append(pred)
+            except:
+                continue
+        
+        # Sort by score
+        all_signals.sort(key=lambda x: x.get('score', 0), reverse=True)
+        
+        # Calculate allocations
+        top_picks = all_signals[:3]  # Top 3 picks
+        total_score = sum(s.get('score', 1) for s in top_picks) or 1
+        
+        stock_recommendations = []
+        total_allocated = 0.0
+        
+        for signal in top_picks:
+            score = signal.get('score', 1)
+            allocation_pct = score / total_score
+            amount = budget * allocation_pct * 0.8  # Use 80% of budget, keep 20% cash
+            
+            current_price = signal.get('current_price', 0)
+            shares = amount / current_price if current_price > 0 else 0
+            
+            stock_recommendations.append({
+                'ticker': signal.get('ticker'),
+                'prediction': signal.get('prediction'),
+                'current_price': current_price,
+                'shares': shares,
+                'actual_amount': amount,
+                'allocation_percentage': allocation_pct * 100,
+                'confidence': signal.get('confidence', 50),
+                'score': score,
+                'potential_change': signal.get('potential_change', 0),
+                'factors': signal.get('factors', [])
+            })
+            total_allocated += amount
+        
+        return {
+            "total_budget": budget,
+            "total_allocated": total_allocated,
+            "remaining_budget": budget - total_allocated,
+            "recommendations": stock_recommendations,
+            "message": f"Based on your ${budget:.2f} budget, here are top {len(stock_recommendations)} stock picks"
+        }
     except HTTPException:
         raise
     except Exception as e:

@@ -721,22 +721,26 @@ def get_all_signals(category: Optional[str] = None) -> List[Dict]:
     return signals_data
 
 
-def get_all_predictions(category: Optional[str] = None, limit: int = 5) -> List[Dict]:
+def get_all_predictions(category: Optional[str] = None, limit: int = 5, watchlist: Optional[List[str]] = None) -> List[Dict]:
     """Get predictions for watchlist stocks using parallel processing"""
-    # Combine personal watchlist with default watchlist
-    try:
-        import database
-        personal_watchlist = database.get_personal_watchlist()
-        default_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
-        
-        # Combine both watchlists and remove duplicates
-        combined_watchlist = list(set(personal_watchlist + default_watchlist))
-        target_watchlist = combined_watchlist if combined_watchlist else default_watchlist
-        
-        print(f"Using combined watchlist with {len(target_watchlist)} stocks (personal: {len(personal_watchlist)}, default: {len(default_watchlist)})")
-    except Exception as e:
-        print(f"Error fetching personal watchlist, using default: {e}")
-        target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
+    # Use provided watchlist or combine personal with default
+    if watchlist is not None:
+        target_watchlist = watchlist
+        print(f"Using provided watchlist with {len(target_watchlist)} stocks")
+    else:
+        try:
+            import database
+            personal_watchlist = database.get_personal_watchlist()
+            default_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
+            
+            # Combine both watchlists and remove duplicates
+            combined_watchlist = list(set(personal_watchlist + default_watchlist))
+            target_watchlist = combined_watchlist if combined_watchlist else default_watchlist
+            
+            print(f"Using combined watchlist with {len(target_watchlist)} stocks (personal: {len(personal_watchlist)}, default: {len(default_watchlist)})")
+        except Exception as e:
+            print(f"Error fetching personal watchlist, using default: {e}")
+            target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
     
     predictions = []
     
