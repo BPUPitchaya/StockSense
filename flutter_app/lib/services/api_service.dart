@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config.dart';
+import '../config.dart';
 
 class ApiService {
   static String baseUrl = Config.apiBaseUrl;
@@ -227,33 +227,76 @@ class ApiService {
       throw Exception('Failed to remove from watchlist: ${response.body}');
     }
   }
-}
 
-class Signal {
-  final String ticker;
-  final String prediction;
-  final double confidence;
-  final double score;
-  final double potentialChange;
-  final String? category;
-
-  Signal({
-    required this.ticker,
-    required this.prediction,
-    required this.confidence,
-    required this.score,
-    required this.potentialChange,
-    this.category,
-  });
-
-  factory Signal.fromJson(Map<String, dynamic> json) {
-    return Signal(
-      ticker: json['ticker'],
-      prediction: json['prediction'],
-      confidence: json['confidence'].toDouble(),
-      score: json['score'].toDouble(),
-      potentialChange: json['potential_change'].toDouble(),
-      category: json['category'],
-    );
+  // Additional methods for other screens
+  static Future<Map<String, dynamic>> searchStock(String ticker) async {
+    final response = await http.get(Uri.parse('$baseUrl/search/$ticker'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to search stock: ${response.body}');
+    }
   }
+
+  static Future<List<dynamic>> getStockHistory(String ticker, String period) async {
+    final response = await http.get(Uri.parse('$baseUrl/history/$ticker?period=$period'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get stock history: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getStockInfo(String ticker) async {
+    final response = await http.get(Uri.parse('$baseUrl/info/$ticker'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get stock info: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getPredictions() async {
+    final response = await http.get(Uri.parse('$baseUrl/predictions'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get predictions: ${response.body}');
+    }
+  }
+
+  static Future<void> updatePosition(int positionId, Map<String, dynamic> position) async {
+    final headers = await _getHeaders();
+    final response = await http.put(
+      Uri.parse('$baseUrl/portfolio/$positionId'),
+      headers: headers,
+      body: json.encode(position),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update position: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getBudgetRecommendations() async {
+    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get budget recommendations: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> validateStock(String ticker) async {
+    final response = await http.get(Uri.parse('$baseUrl/validate-stock/$ticker'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to validate stock: ${response.body}');
+    }
+  }
+
+  // Aliases for personal watchlist methods
+  static Future<List<String>> getPersonalWatchlist() async => getWatchlist();
+  static Future<void> addToPersonalWatchlist(String ticker) async => addToWatchlist(ticker);
+  static Future<void> removeFromPersonalWatchlist(String ticker) async => removeFromWatchlist(ticker);
 }

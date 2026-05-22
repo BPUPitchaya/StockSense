@@ -30,11 +30,11 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
     try {
       final loadedPositions = await ApiService.getPortfolio();
-      final portfolioValueData = await ApiService.getPortfolioValue();
+      final portfolioValue = await ApiService.getPortfolioValue();
       setState(() {
-        positions = loadedPositions;
-        totalPortfolioValue = portfolioValueData['total_value'] ?? 0.0;
-        positionCount = portfolioValueData['position_count'] ?? 0;
+        positions = loadedPositions.map((p) => Position.fromJson(p)).toList();
+        totalPortfolioValue = portfolioValue;
+        positionCount = loadedPositions.length;
         isLoading = false;
       });
     } catch (e) {
@@ -173,7 +173,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   quantity: double.parse(quantityController.text),
                   date: dateController.text,
                 );
-                await ApiService.addPosition(position);
+                await ApiService.addPosition(position.toJson());
                 Navigator.pop(context);
                 _loadPortfolio();
               } catch (e) {

@@ -306,7 +306,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         date: _buyDate.toString().split(' ')[0],
       );
       
-      await ApiService.addPosition(position);
+      await ApiService.addPosition(position.toJson());
       
       Navigator.pop(context);
       

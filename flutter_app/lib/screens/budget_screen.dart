@@ -10,7 +10,7 @@ class BudgetScreen extends StatefulWidget {
 
 class _BudgetScreenState extends State<BudgetScreen> {
   final TextEditingController _budgetController = TextEditingController();
-  Map<String, dynamic>? _currentBudget;
+  double _currentBudget = 0.0;
   Map<String, dynamic>? _recommendations;
   bool _isLoading = false;
   String? _errorMessage;
@@ -31,9 +31,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       final budget = await ApiService.getBudget();
       setState(() {
         _currentBudget = budget;
-        if (budget != null && budget['budget'] != null) {
-          _budgetController.text = budget['budget']['amount'].toString();
-        }
+        _budgetController.text = budget.toString();
         _isLoading = false;
       });
     } catch (e) {
