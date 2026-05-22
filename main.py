@@ -321,11 +321,14 @@ def get_portfolio(authorization: str = Header(...)):
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
+        print(f"Fetching portfolio for user_id: {user_id}")
         positions = database.get_all_positions(user_id=user_id)
+        print(f"Found {len(positions)} positions")
         return {"positions": positions}
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Portfolio error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/portfolio/{position_id}")
