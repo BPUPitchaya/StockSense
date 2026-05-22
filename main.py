@@ -271,6 +271,18 @@ def search_stock(ticker: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/validate-stock/{ticker}")
+def validate_stock(ticker: str):
+    """Validate a stock ticker"""
+    try:
+        stock_info = signals.get_stock_info_finnhub(ticker)
+        if stock_info:
+            return {"valid": True, "ticker": ticker, "name": stock_info.get('description', '')}
+        else:
+            return {"valid": False, "ticker": ticker}
+    except Exception as e:
+        return {"valid": False, "ticker": ticker, "error": str(e)}
+
 @app.get("/history/{ticker}")
 def get_stock_history(ticker: str, period: str = "3mo"):
     """Get stock history"""
