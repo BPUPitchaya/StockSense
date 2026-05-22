@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import '../models/signal.dart';
 
 class ApiService {
   static String baseUrl = Config.apiBaseUrl;

@@ -106,7 +106,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   date: dateController.text,
                 );
                 if (position.id != null) {
-                  await ApiService.updatePosition(position.id!, updatedPosition);
+                  await ApiService.updatePosition(position.id!, updatedPosition.toJson());
                   Navigator.pop(context);
                   _loadPortfolio();
                 }

@@ -119,9 +119,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      if (_currentBudget != null && _currentBudget!['budget'] != null)
+                      if (_currentBudget > 0)
                         Text(
-                          'Current Budget: \$${_currentBudget!['budget']['amount'].toStringAsFixed(2)}',
+                          'Current Budget: \$${_currentBudget.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,

@@ -15,7 +15,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
   bool isLoading = true;
   String? error;
   final TextEditingController _searchController = TextEditingController();
-  Signal? searchedSignal;
+  Map<String, dynamic>? searchedSignal;
   bool isSearching = false;
   List<String> personalWatchlist = [];
   Map<String, bool> inWatchlist = {};
@@ -222,7 +222,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
       body: isSearching
           ? const Center(child: CircularProgressIndicator())
           : searchedSignal != null
-              ? _buildSignalCard(searchedSignal!)
+              ? _buildSignalCard(Signal.fromJson(searchedSignal!))
               : isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : error != null
