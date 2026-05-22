@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../models/signal.dart';
+import '../models/historical_data.dart';
 
 class ApiService {
   static String baseUrl = Config.apiBaseUrl;
@@ -239,10 +240,11 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> getStockHistory(String ticker, String period) async {
+  static Future<List<HistoricalData>> getStockHistory(String ticker, String period) async {
     final response = await http.get(Uri.parse('$baseUrl/history/$ticker?period=$period'));
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((item) => HistoricalData.fromJson(item as Map<String, dynamic>)).toList();
     } else {
       throw Exception('Failed to get stock history: ${response.body}');
     }

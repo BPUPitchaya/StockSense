@@ -375,13 +375,16 @@ def get_budget(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/budget-recommendations")
-def get_budget_recommendations(authorization: str = Header(...)):
+def get_budget_recommendations(authorization: Optional[str] = Header(None)):
     """Get budget recommendations"""
     try:
-        payload = verify_jwt_token(authorization)
-        user_id = payload.get("user_id")
+        if authorization:
+            payload = verify_jwt_token(authorization)
+            user_id = payload.get("user_id")
+            budget = database.get_budget(user_id=user_id)
+        else:
+            budget = 0.0
         
-        budget = database.get_budget(user_id=user_id)
         # Simple recommendation logic
         if budget <= 0:
             return {"recommendations": ["Set a budget to get recommendations"]}
