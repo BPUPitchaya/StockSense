@@ -251,7 +251,7 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
 def get_stock_info_endpoint(ticker: str):
     """Get stock info with market cap, P/E ratio, etc."""
     try:
-        stock_info = signals.get_stock_info(ticker)
+        stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info is not None:
             return stock_info
         else:
