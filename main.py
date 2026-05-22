@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, BaseModel, List, Optional
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
 import database
 import signals
 from datetime import datetime, timedelta
