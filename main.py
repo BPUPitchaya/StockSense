@@ -60,11 +60,12 @@ class Position(BaseModel):
 
 class Signal(BaseModel):
     ticker: str
-    prediction: str
-    confidence: float
-    score: float
-    potential_change: float
-    category: Optional[str] = None
+    current_price: float
+    ma50: Optional[float] = None
+    ma200: Optional[float] = None
+    rsi: Optional[float] = None
+    signal: str
+    date: str
 
 # Simple in-memory cache
 cache: Dict[str, tuple] = {}
@@ -197,6 +198,34 @@ def get_categories():
 def get_signals(category: Optional[str] = None):
     """Get trading signals for watchlist stocks"""
     cache_key = get_cache_key("signals", category=category or "all")
+    cached_data = get_from_cache(cache_key)
+    if cached_data:
+        return cached_data
+    
+    try:
+        predictions = signals.get_all_predictions(category=category)
+        # Extract all signals from gainers and losers and map to Signal model
+        all_signals = []
+        for stock_data in predictions.get('gainers', []) + predictions.get('losers', []):
+            signal = Signal(
+                ticker=stock_data.get('ticker', ''),
+                current_price=stock_data.get('current_price', 0.0),
+                ma50=stock_data.get('ma50'),
+                ma200=stock_data.get('ma200'),
+                rsi=stock_data.get('rsi'),
+                signal=stock_data.get('prediction', 'HOLD'),
+                date=datetime.utcnow().strftime('%Y-%m-%d')
+            )
+            all_signals.append(signal)
+        set_cache(cache_key, all_signals)
+        return all_signals
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions")
+def get_predictions(category: Optional[str] = None):
+    """Get all predictions with gainers and losers"""
+    cache_key = get_cache_key("predictions", category=category or "all")
     cached_data = get_from_cache(cache_key)
     if cached_data:
         return cached_data
