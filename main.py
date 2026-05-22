@@ -230,9 +230,9 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         user_id = payload.get("user_id")
         
         # Get user's watchlist
-        watchlist = database.get_watchlist(user_id=user_id)
+        watchlist = database.get_personal_watchlist(user_id=user_id)
         if not watchlist:
-            watchlist = signals.get_default_watchlist()
+            watchlist = signals.WATCHLIST
         
         # Use watchlist in cache key to make it user-specific
         watchlist_key = ",".join(sorted(watchlist))
@@ -401,15 +401,15 @@ def get_budget_recommendations(authorization: str = Header(...)):
             }
         
         # Get watchlist
-        watchlist = database.get_watchlist(user_id=user_id)
+        watchlist = database.get_personal_watchlist(user_id=user_id)
         if not watchlist:
-            watchlist = signals.get_default_watchlist()
+            watchlist = signals.WATCHLIST
         
         # Get predictions for watchlist stocks
         all_signals = []
         for ticker in watchlist[:5]:  # Limit to top 5
             try:
-                pred = signals.get_prediction(ticker)
+                pred = signals.predict_stock(ticker)
                 if pred and pred.get('prediction') in ['Buy', 'Strong Buy']:
                     all_signals.append(pred)
             except:

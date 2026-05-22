@@ -38,6 +38,13 @@ class PersonalWatchlist(Base):
     ticker = Column(String, nullable=False)
     added_at = Column(DateTime, default=datetime.utcnow)
 
+class Budget(Base):
+    __tablename__ = 'budgets'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    amount = Column(Float, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
 def init_db():
     """Initialize the database"""
     try:
@@ -367,9 +374,19 @@ def set_budget(amount: float, user_id: int = None) -> bool:
     """Set the budget for a user"""
     session = SessionLocal()
     try:
-        # For simplicity, we'll store budget in a separate table or use user model
-        # For now, this is a placeholder
+        existing = session.query(Budget).filter(Budget.user_id == user_id).first()
+        if existing:
+            existing.amount = amount
+            existing.updated_at = datetime.utcnow()
+        else:
+            budget = Budget(user_id=user_id, amount=amount)
+            session.add(budget)
+        session.commit()
         return True
+    except Exception as e:
+        session.rollback()
+        print(f"Error setting budget: {e}")
+        return False
     finally:
         session.close()
 
@@ -377,7 +394,10 @@ def get_budget(user_id: int = None) -> float:
     """Get the budget for a user"""
     session = SessionLocal()
     try:
-        # Placeholder - return default budget
-        return 10000.0
+        budget = session.query(Budget).filter(Budget.user_id == user_id).first()
+        return budget.amount if budget else 0.0
+    except Exception as e:
+        print(f"Error getting budget: {e}")
+        return 0.0
     finally:
         session.close()

@@ -260,7 +260,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getPredictions() async {
-    final response = await http.get(Uri.parse('$baseUrl/predictions'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/predictions'), headers: headers);
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -281,7 +282,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getBudgetRecommendations() async {
-    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'), headers: headers);
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
