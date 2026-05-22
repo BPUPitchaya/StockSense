@@ -300,7 +300,7 @@ def get_all_positions(user_id: int = None) -> List[Dict]:
                 'ticker': pos.ticker,
                 'buy_price': pos.buy_price,
                 'quantity': pos.quantity,
-                'date': pos.date.isoformat() if pos.date else None
+                'date': pos.date.isoformat() if pos.date and hasattr(pos.date, 'isoformat') else pos.date if pos.date else None
             }
             for pos in positions
         ]

@@ -58,6 +58,9 @@ class Position(BaseModel):
     quantity: float
     date: Optional[str] = None
 
+class WatchlistRequest(BaseModel):
+    ticker: str
+
 class Signal(BaseModel):
     ticker: str
     current_price: float
@@ -349,13 +352,13 @@ def delete_position(position_id: int, authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/watchlist")
-def add_to_watchlist(ticker: str, authorization: str = Header(...)):
+def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)):
     """Add a stock to personal watchlist"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        success = database.add_to_watchlist(ticker, user_id=user_id)
+        success = database.add_to_watchlist(request.ticker, user_id=user_id)
         if success:
             return {"message": "Stock added to watchlist"}
         else:
