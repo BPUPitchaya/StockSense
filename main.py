@@ -266,11 +266,17 @@ def get_stock_info_endpoint(ticker: str):
 def search_stock(ticker: str):
     """Search/validate a stock ticker"""
     try:
+        # Try Finnhub first (faster, better for US stocks)
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
             return stock_info
-        else:
-            raise HTTPException(status_code=404, detail="Stock not found")
+        
+        # Fallback to yfinance for international exchanges (Thai, etc.)
+        stock_info = signals.get_stock_info(ticker)
+        if stock_info:
+            return stock_info
+        
+        raise HTTPException(status_code=404, detail="Stock not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
