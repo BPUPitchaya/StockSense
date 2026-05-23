@@ -119,6 +119,13 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   Future<void> _removeFromPersonalWatchlist() async {
     try {
       await ApiService.removeFromPersonalWatchlist(widget.signal.ticker);
+      // Force state update immediately
+      if (mounted) {
+        setState(() {
+          isInWatchlist = false;
+          personalWatchlist.remove(widget.signal.ticker);
+        });
+      }
       await _loadPersonalWatchlist();
       
       if (mounted) {
