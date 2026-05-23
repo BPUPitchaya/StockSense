@@ -269,11 +269,13 @@ def search_stock(ticker: str):
         # Try Finnhub first (faster, better for US stocks)
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
+            stock_info['ticker'] = ticker  # Preserve original ticker with suffix
             return stock_info
         
         # Fallback to yfinance for international exchanges (Thai, etc.)
         stock_info = signals.get_stock_info(ticker)
         if stock_info:
+            stock_info['ticker'] = ticker  # Preserve original ticker with suffix
             return stock_info
         
         raise HTTPException(status_code=404, detail="Stock not found")
