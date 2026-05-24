@@ -12,7 +12,7 @@ import finnhub
 # Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
 CATEGORIES = {
     "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
-    "Commodities": ["IAU", "SLV"],
+    "Commodities": ["GC=F", "SI=F"],
 }
 
 # Flat watchlist for backward compatibility
