@@ -22,6 +22,9 @@ WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
+# Simple local cache for stock info
+_stock_info_cache: Dict[str, Dict] = {}
+
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """Calculate RSI manually"""
@@ -434,11 +437,9 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
 
 def get_stock_info(ticker: str) -> Optional[Dict]:
     """Get detailed stock information with retry logic for rate limiting"""
-    # Check cache first
-    cache_key = f"stock_info_{ticker}"
-    cached = get_from_cache(cache_key)
-    if cached:
-        return cached
+    # Check local cache first
+    if ticker in _stock_info_cache:
+        return _stock_info_cache[ticker]
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -465,8 +466,8 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
                 'profit_margin': info.get('profitMargins'),
                 'revenue': info.get('totalRevenue'),
             }
-            # Cache for 1 hour
-            set_cache(cache_key, result, ttl=3600)
+            # Cache result locally
+            _stock_info_cache[ticker] = result
             return result
         except Exception as e:
             print(f"Error fetching info for {ticker} (attempt {attempt + 1}/{max_retries}): {e}")
