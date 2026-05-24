@@ -257,13 +257,15 @@ class _SignalsScreenState extends State<SignalsScreen> {
     return Card(
       margin: const EdgeInsets.all(8),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
+        onTap: () async {
+          await Navigator.push(            context,
             MaterialPageRoute(
               builder: (context) => StockDetailScreen(signal: signal),
             ),
           );
+          if (mounted) {
+            _clearSearch();
+          }
         },
         child: ListTile(
           title: Row(
