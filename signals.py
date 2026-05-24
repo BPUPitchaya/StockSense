@@ -432,33 +432,38 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
 
 
 def get_stock_info(ticker: str) -> Optional[Dict]:
-    """Get detailed stock information"""
-    try:
-        time.sleep(2.0)  # Increase delay to 2 seconds to prevent rate limiting
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        if not info:
-            return None
-        
-        return {
-            'ticker': ticker,
-            'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
-            'market_cap': info.get('marketCap'),
-            'pe_ratio': info.get('trailingPE') or info.get('forwardPE'),
-            'dividend_yield': info.get('dividendYield'),
-            'dividend_rate': info.get('dividendRate'),
-            'beta': info.get('beta'),
-            'eps': info.get('trailingEps') or info.get('forwardEps'),
-            'avg_volume': info.get('averageVolume') or info.get('averageVolume10days'),
-            '52_week_high': info.get('fiftyTwoWeekHigh'),
-            '52_week_low': info.get('fiftyTwoWeekLow'),
-            'profit_margin': info.get('profitMargins'),
-            'revenue': info.get('totalRevenue'),
-        }
-    except Exception as e:
-        print(f"Error fetching info for {ticker}: {e}")
-        return None
+    """Get detailed stock information with retry logic for rate limiting"""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            time.sleep(2.0)  # Base delay to prevent rate limiting
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            
+            if not info:
+                return None
+            
+            return {
+                'ticker': ticker,
+                'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+                'market_cap': info.get('marketCap'),
+                'pe_ratio': info.get('trailingPE') or info.get('forwardPE'),
+                'dividend_yield': info.get('dividendYield'),
+                'dividend_rate': info.get('dividendRate'),
+                'beta': info.get('beta'),
+                'eps': info.get('trailingEps') or info.get('forwardEps'),
+                'avg_volume': info.get('averageVolume') or info.get('averageVolume10days'),
+                '52_week_high': info.get('fiftyTwoWeekHigh'),
+                '52_week_low': info.get('fiftyTwoWeekLow'),
+                'profit_margin': info.get('profitMargins'),
+                'revenue': info.get('totalRevenue'),
+            }
+        except Exception as e:
+            print(f"Error fetching info for {ticker} (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(3 * (attempt + 1))  # Exponential backoff: 3s, 6s, 9s
+            else:
+                return None
 
 
 def predict_stock(ticker: str) -> Optional[Dict]:
