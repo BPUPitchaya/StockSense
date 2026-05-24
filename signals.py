@@ -22,8 +22,23 @@ WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
-# Simple local cache for stock info
+# Simple local caches
 _stock_info_cache: Dict[str, Dict] = {}
+_stock_history_cache: Dict[str, pd.DataFrame] = {}
+
+# Global rate limiting - track last yfinance request time
+_last_yfinance_request: float = 0
+_yfinance_min_delay: float = 8.0  # Minimum 8 seconds between yfinance requests
+
+def _yfinance_delay():
+    """Enforce minimum delay between yfinance requests"""
+    global _last_yfinance_request
+    elapsed = time.time() - _last_yfinance_request
+    if elapsed < _yfinance_min_delay:
+        sleep_time = _yfinance_min_delay - elapsed
+        print(f"Rate limiting: sleeping {sleep_time:.1f}s before yfinance request")
+        time.sleep(sleep_time)
+    _last_yfinance_request = time.time()
 
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -180,19 +195,29 @@ def analyze_timeframe(df: pd.DataFrame, timeframe: str) -> Dict:
 
 
 def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
-    """Fetch historical stock data from yfinance with retry logic"""
+    """Fetch historical stock data from yfinance with retry logic and rate limiting"""
+    cache_key = f"{ticker}_{period}"
+    
+    # Check cache first
+    if cache_key in _stock_history_cache:
+        print(f"Using cached history for {ticker}")
+        return _stock_history_cache[cache_key]
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            _yfinance_delay()  # Enforce rate limiting
             stock = yf.Ticker(ticker)
             df = stock.history(period=period)
             if df.empty:
                 return None
+            # Cache the result
+            _stock_history_cache[cache_key] = df
             return df
         except Exception as e:
             print(f"Error fetching data for {ticker}: {e}")
             if attempt < max_retries - 1:
-                time.sleep(5 * (attempt + 1))
+                time.sleep(10 * (attempt + 1))  # 10s, 20s, 30s
             else:
                 return None
 
@@ -350,7 +375,7 @@ def get_all_signals() -> List[Dict]:
         result = analyze_stock(ticker)
         if result:
             signals.append(result)
-        time.sleep(2.0)  # Increase delay to 2 seconds to prevent rate limiting
+        time.sleep(12.0)  # Increased delay to prevent rate limiting (must be >8s for yfinance)
     
     return signals
 
@@ -433,7 +458,7 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            time.sleep(5.0)  # Increased delay to prevent rate limiting
+            _yfinance_delay()  # Enforce global rate limiting
             stock = yf.Ticker(ticker)
             info = stock.info
             
