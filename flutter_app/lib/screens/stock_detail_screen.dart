@@ -380,6 +380,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                       _buildDetailsSection(),
                       const SizedBox(height: 24),
                       _buildStockInfoSection(),
+                      const SizedBox(height: 24),
+                      _buildDescriptionSection(),
                     ],
                   ),
                 ),
@@ -595,6 +597,40 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDescriptionSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'About',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(_getAboutDescription()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getAboutDescription() {
+    final ticker = widget.signal.ticker;
+    final descriptions = {
+      'GC=F': 'Gold (GC=F) is a precious metal commodity traded on futures markets. Price is per troy ounce (31.1035g). Gold is often used as a store of value and hedge against inflation. Thai gold price is typically quoted per baht weight (15.2g).',
+      'SI=F': 'Silver (SI=F) is a precious metal commodity traded on futures markets. Price is per troy ounce (31.1035g). Silver has both industrial and investment demand.',
+      'GLD': 'GLD (SPDR Gold Shares) is an ETF that tracks the price of gold. Each share represents approximately 1/10th of an ounce of gold.',
+      'SLV': 'SLV (iShares Silver Trust) is an ETF that tracks the price of silver. Each share represents approximately 1 ounce of silver.',
+      'IAU': 'IAU (iShares Gold Trust) is an ETF that tracks the price of gold. Each share represents approximately 1/100th of an ounce of gold.',
+    };
+    return descriptions[ticker] ?? 'This is a stock/ETF that can be traded on major exchanges. Prices are shown in USD. Please research this security before investing.';
   }
 
   Widget _buildInfoRow(String label, String value) {

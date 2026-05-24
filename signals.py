@@ -12,7 +12,6 @@ import finnhub
 # Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
 CATEGORIES = {
     "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
-    "Commodities": ["GC=F", "SI=F"],
 }
 
 # Flat watchlist for backward compatibility
@@ -28,7 +27,7 @@ _stock_history_cache: Dict[str, pd.DataFrame] = {}
 
 # Global rate limiting - track last yfinance request time
 _last_yfinance_request: float = 0
-_yfinance_min_delay: float = 8.0  # Minimum 8 seconds between yfinance requests
+_yfinance_min_delay: float = 5.0  # Minimum 5 seconds between yfinance requests (for occasional searches)
 
 def _yfinance_delay():
     """Enforce minimum delay between yfinance requests"""
@@ -375,7 +374,7 @@ def get_all_signals() -> List[Dict]:
         result = analyze_stock(ticker)
         if result:
             signals.append(result)
-        time.sleep(12.0)  # Increased delay to prevent rate limiting (must be >8s for yfinance)
+        time.sleep(3.0)  # 3 second delay between stocks (Finnhub doesn't need much delay)
     
     return signals
 
