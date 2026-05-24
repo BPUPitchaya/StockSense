@@ -440,9 +440,12 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
             if not info:
                 return None
             
+            # Determine if this is a futures ticker
+            is_futures = ticker.endswith('=F')
+            
             result = {
                 'ticker': ticker,
-                'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+                'current_price': info.get('currentPrice') or info.get('regularMarketPrice') or info.get('lastPrice') or info.get('price'),
                 'market_cap': info.get('marketCap'),
                 'pe_ratio': info.get('trailingPE') or info.get('forwardPE'),
                 'dividend_yield': info.get('dividendYield'),
@@ -455,6 +458,12 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
                 'profit_margin': info.get('profitMargins'),
                 'revenue': info.get('totalRevenue'),
             }
+            
+            # Add unit/currency info for futures
+            if is_futures:
+                result['unit'] = 'per troy ounce' if ticker.startswith('GC') else 'per troy ounce' if ticker.startswith('SI') else 'per contract'
+                result['currency'] = 'USD'
+                result['is_futures'] = True
             # Cache result locally
             _stock_info_cache[ticker] = result
             return result
