@@ -564,13 +564,15 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildInfoRow('Market Cap', _formatNumber(info['market_cap'] * 1e6)),
+            if (info['market_cap'] != null)
+              _buildInfoRow('Market Cap', _formatNumber((info['market_cap'] as num) * 1e6)),
             _buildInfoRow('P/E Ratio', info['pe_ratio']?.toStringAsFixed(2) ?? 'N/A'),
-            _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${(info['dividend_yield'] * 100).toStringAsFixed(2)}%' : 'N/A'),
+            _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${((info['dividend_yield'] as num) * 100).toStringAsFixed(2)}%' : 'N/A'),
             _buildInfoRow('Dividend Rate', '\$${info['dividend_rate']?.toStringAsFixed(2) ?? 'N/A'}'),
             _buildInfoRow('Beta', info['beta']?.toStringAsFixed(2) ?? 'N/A'),
             _buildInfoRow('EPS', '\$${info['eps']?.toStringAsFixed(2) ?? 'N/A'}'),
-            _buildInfoRow('Avg Volume', _formatNumber(info['avg_volume'])),
+            if (info['avg_volume'] != null)
+              _buildInfoRow('Avg Volume', _formatNumber(info['avg_volume'])),
             _buildInfoRow('52-Week High', '\$${info['52_week_high']?.toStringAsFixed(2) ?? 'N/A'}'),
             _buildInfoRow('52-Week Low', '\$${info['52_week_low']?.toStringAsFixed(2) ?? 'N/A'}'),
             if (info['profit_margin'] != null)
