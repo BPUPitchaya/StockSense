@@ -464,6 +464,8 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
                 result['unit'] = 'per troy ounce' if ticker.startswith('GC') else 'per troy ounce' if ticker.startswith('SI') else 'per contract'
                 result['currency'] = 'USD'
                 result['is_futures'] = True
+                # Add gram equivalent (1 troy ounce = 31.1035 grams)
+                result['grams'] = 31.1035
             # Cache result locally
             _stock_info_cache[ticker] = result
             return result

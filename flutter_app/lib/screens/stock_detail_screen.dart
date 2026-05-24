@@ -404,6 +404,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             Text('Current Price: \$${widget.signal.currentPrice.toStringAsFixed(2)}'),
             if (stockInfo != null && stockInfo!['unit'] != null)
               Text('Unit: ${stockInfo!['unit']}'),
+            if (stockInfo != null && stockInfo!['grams'] != null)
+              Text('(${stockInfo!['grams']} grams)'),
             if (stockInfo != null && stockInfo!['currency'] != null)
               Text('Currency: ${stockInfo!['currency']}'),
             if (widget.signal.ma50 != null)
