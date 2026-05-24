@@ -180,16 +180,21 @@ def analyze_timeframe(df: pd.DataFrame, timeframe: str) -> Dict:
 
 
 def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
-    """Fetch historical stock data from yfinance"""
-    try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period=period)
-        if df.empty:
-            return None
-        return df
-    except Exception as e:
-        print(f"Error fetching data for {ticker}: {e}")
-        return None
+    """Fetch historical stock data from yfinance with retry logic"""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(period=period)
+            if df.empty:
+                return None
+            return df
+        except Exception as e:
+            print(f"Error fetching data for {ticker}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(5 * (attempt + 1))
+            else:
+                return None
 
 
 def calculate_indicators(df: pd.DataFrame) -> Dict:
