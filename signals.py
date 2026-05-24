@@ -433,17 +433,23 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
 
 def get_stock_info(ticker: str) -> Optional[Dict]:
     """Get detailed stock information with retry logic for rate limiting"""
+    # Check cache first
+    cache_key = f"stock_info_{ticker}"
+    cached = get_from_cache(cache_key)
+    if cached:
+        return cached
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            time.sleep(2.0)  # Base delay to prevent rate limiting
+            time.sleep(5.0)  # Increased delay to prevent rate limiting
             stock = yf.Ticker(ticker)
             info = stock.info
             
             if not info:
                 return None
             
-            return {
+            result = {
                 'ticker': ticker,
                 'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
                 'market_cap': info.get('marketCap'),
@@ -458,10 +464,13 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
                 'profit_margin': info.get('profitMargins'),
                 'revenue': info.get('totalRevenue'),
             }
+            # Cache for 1 hour
+            set_cache(cache_key, result, ttl=3600)
+            return result
         except Exception as e:
             print(f"Error fetching info for {ticker} (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                time.sleep(3 * (attempt + 1))  # Exponential backoff: 3s, 6s, 9s
+                time.sleep(5 * (attempt + 1))  # Exponential backoff: 5s, 10s, 15s
             else:
                 return None
 
