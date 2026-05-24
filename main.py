@@ -265,20 +265,23 @@ def get_stock_info_endpoint(ticker: str):
 @app.get("/search/{ticker}")
 def search_stock(ticker: str):
     """Search/validate a stock ticker"""
+    # For futures tickers (ending in =F), use yfinance directly
+    if ticker.endswith('=F'):
+        try:
+            stock_info = signals.get_stock_info(ticker)
+            if stock_info:
+                return stock_info
+        except Exception as e:
+            print(f"yfinance failed for {ticker}: {e}")
+        raise HTTPException(status_code=404, detail="Commodity not found")
+    
+    # For regular stocks, use Finnhub
     try:
-        # Try Finnhub first (faster, better for US stocks)
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
-            stock_info['ticker'] = ticker  # Preserve original ticker with suffix
             return stock_info
-        
-        # Fallback to yfinance for international exchanges (Thai, etc.)
-        stock_info = signals.get_stock_info(ticker)
-        if stock_info:
-            stock_info['ticker'] = ticker  # Preserve original ticker with suffix
-            return stock_info
-        
-        raise HTTPException(status_code=404, detail="Stock not found")
+        else:
+            raise HTTPException(status_code=404, detail="Stock not found or not supported (US market only)")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
