@@ -163,8 +163,12 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   Color _getSignalColor(String signal) {
     switch (signal.toUpperCase()) {
+      case 'STRONG BUY':
+        return Colors.green.shade700;
       case 'BUY':
         return Colors.green;
+      case 'STRONG SELL':
+        return Colors.red.shade700;
       case 'SELL':
         return Colors.red;
       default:
