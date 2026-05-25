@@ -496,23 +496,33 @@ def get_all_signals() -> List[Dict]:
                 current_price, open_price, previous_close, percent_change, high, low
             )
             
+            # Convert all values to Python native types for JSON serialization
+            def to_native(val):
+                if val is None:
+                    return None
+                if isinstance(val, (np.floating, np.integer)):
+                    return float(val)
+                if isinstance(val, np.bool_):
+                    return bool(val)
+                return val
+            
             result = {
                 'ticker': ticker,
                 'name': stock_info.get('name'),  # Company full name
-                'current_price': current_price,
+                'current_price': to_native(current_price),
                 'signal': signal,
-                'change': stock_info.get('change'),
-                'percent_change': percent_change,
-                'high': stock_info.get('high'),
-                'low': stock_info.get('low'),
-                'open': stock_info.get('open'),
-                'previous_close': stock_info.get('previous_close'),
-                'market_cap': stock_info.get('market_cap'),
-                'pe_ratio': stock_info.get('pe_ratio'),
-                'beta': stock_info.get('beta'),
-                'eps': stock_info.get('eps'),
-                '52_week_high': stock_info.get('52_week_high'),
-                '52_week_low': stock_info.get('52_week_low'),
+                'change': to_native(stock_info.get('change')),
+                'percent_change': to_native(percent_change),
+                'high': to_native(stock_info.get('high')),
+                'low': to_native(stock_info.get('low')),
+                'open': to_native(stock_info.get('open')),
+                'previous_close': to_native(stock_info.get('previous_close')),
+                'market_cap': to_native(stock_info.get('market_cap')),
+                'pe_ratio': to_native(stock_info.get('pe_ratio')),
+                'beta': to_native(stock_info.get('beta')),
+                'eps': to_native(stock_info.get('eps')),
+                '52_week_high': to_native(stock_info.get('52_week_high')),
+                '52_week_low': to_native(stock_info.get('52_week_low')),
                 'industry': stock_info.get('industry'),
                 'sector': stock_info.get('sector'),
                 'description': stock_info.get('description'),
