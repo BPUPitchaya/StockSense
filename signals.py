@@ -12,17 +12,12 @@ from io import StringIO
 import finnhub
 import redis
 
-# Categorized watchlist for selective loading (30 stocks for more investment options)
+# Core 5 stocks for fast loading
 CATEGORIES = {
     "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
-    "Tech Growth": ["AMZN", "META", "NFLX", "CRM", "ADBE", "ORCL", "INTC", "AMD"],
-    "Finance": ["JPM", "BAC", "GS", "V", "MA", "AXP"],
-    "Healthcare": ["JNJ", "PFE", "UNH", "ABBV", "MRK"],
-    "Consumer": ["WMT", "HD", "PG", "KO", "DIS"],
 }
 
-# Flat watchlist for backward compatibility
-WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
+WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"]
 
 # Initialize Finnhub client
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
