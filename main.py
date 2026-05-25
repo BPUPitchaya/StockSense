@@ -199,28 +199,31 @@ def get_categories():
 
 @app.get("/signals", response_model=List[Signal])
 def get_signals(category: Optional[str] = None):
-    """Get trading signals for watchlist stocks"""
-    cache_key = get_cache_key("signals", category=category or "all")
+    """Get trading signals for watchlist stocks - FAST version using Finnhub"""
+    cache_key = get_cache_key("signals_v2", category=category or "all")
     cached_data = get_from_cache(cache_key)
     if cached_data:
         return cached_data
     
     try:
-        predictions = signals.get_all_predictions(category=category)
-        # Extract all signals from gainers and losers and map to Signal model
+        # Use fast Finnhub-based signals (no rate limiting)
+        all_signals_data = signals.get_all_signals()
+        
+        # Map to Signal model
         all_signals = []
-        for stock_data in predictions.get('gainers', []) + predictions.get('losers', []):
+        for stock_data in all_signals_data:
             signal = Signal(
                 ticker=stock_data.get('ticker', ''),
                 current_price=stock_data.get('current_price', 0.0),
                 ma50=stock_data.get('ma50'),
                 ma200=stock_data.get('ma200'),
                 rsi=stock_data.get('rsi'),
-                signal=stock_data.get('prediction', 'HOLD'),
+                signal=stock_data.get('signal', 'HOLD'),
                 date=datetime.utcnow().strftime('%Y-%m-%d')
             )
             all_signals.append(signal)
-        set_cache(cache_key, all_signals)
+        
+        set_cache(cache_key, all_signals, ttl=300)  # Cache for 5 minutes
         return all_signals
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
