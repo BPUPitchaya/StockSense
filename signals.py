@@ -23,7 +23,7 @@ WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
-# Redis cache connection
+# Redis cache connection with authentication
 REDIS_URL = os.getenv('REDIS_URL', 'redis://red-d89tjhq8qa3s73eb4320:JZGjlPWddeVHixHr7rcMBWuHt9Z7mhPD@red-d89tjhq8qa3s73eb4320:6379')
 try:
     redis_client = redis.from_url(REDIS_URL, decode_responses=True)
