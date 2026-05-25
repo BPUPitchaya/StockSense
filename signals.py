@@ -7,7 +7,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 import os
+import json
 import finnhub
+import redis
 
 # Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
 CATEGORIES = {
@@ -21,7 +23,17 @@ WATCHLIST = [stock for stocks in CATEGORIES.values() for stock in stocks]
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
-# Simple local caches
+# Redis cache connection
+REDIS_URL = os.getenv('REDIS_URL', 'redis://red-d89tjhq8qa3s73eb4320:6379')
+try:
+    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()  # Test connection
+    print("Connected to Redis successfully")
+except Exception as e:
+    print(f"Redis connection failed, using local cache: {e}")
+    redis_client = None
+
+# Fallback local caches if Redis unavailable
 _stock_info_cache: Dict[str, Dict] = {}
 _stock_history_cache: Dict[str, pd.DataFrame] = {}
 
@@ -195,11 +207,21 @@ def analyze_timeframe(df: pd.DataFrame, timeframe: str) -> Dict:
 
 def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
     """Fetch historical stock data from yfinance with retry logic and rate limiting"""
-    cache_key = f"{ticker}_{period}"
+    cache_key = f"stock_history:{ticker}_{period}"
     
-    # Check cache first
+    # Check Redis cache first
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                print(f"Using Redis cached history for {ticker}")
+                return pd.read_json(cached)
+        except Exception as e:
+            print(f"Redis cache read failed: {e}")
+    
+    # Fallback to local cache
     if cache_key in _stock_history_cache:
-        print(f"Using cached history for {ticker}")
+        print(f"Using local cached history for {ticker}")
         return _stock_history_cache[cache_key]
     
     max_retries = 3
@@ -210,7 +232,13 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
             df = stock.history(period=period)
             if df.empty:
                 return None
-            # Cache the result
+            # Cache the result in Redis (15 min TTL)
+            if redis_client:
+                try:
+                    redis_client.setex(cache_key, 900, df.to_json())
+                except Exception as e:
+                    print(f"Redis cache write failed: {e}")
+            # Also cache locally as fallback
             _stock_history_cache[cache_key] = df
             return df
         except Exception as e:
@@ -405,6 +433,18 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
 
 def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
     """Get stock information from Finnhub API (more reliable for current price and company info)"""
+    cache_key = f"stock_info_finnhub:{ticker}"
+    
+    # Check Redis cache first
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                print(f"Using Redis cached Finnhub info for {ticker}")
+                return json.loads(cached)
+        except Exception as e:
+            print(f"Redis cache read failed: {e}")
+    
     try:
         # Get quote (current price)
         quote = finnhub_client.quote(ticker)
@@ -443,6 +483,13 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             'currency': profile.get('currency') if profile else None,
             'source': 'finnhub'
         }
+        # Cache result in Redis (15 min TTL)
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 900, json.dumps(result))
+            except Exception as e:
+                print(f"Redis cache write failed: {e}")
+        return result
     except Exception as e:
         print(f"Error fetching Finnhub info for {ticker}: {e}")
         return None
@@ -450,8 +497,21 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
 
 def get_stock_info(ticker: str) -> Optional[Dict]:
     """Get detailed stock information with retry logic for rate limiting"""
-    # Check local cache first
+    cache_key = f"stock_info:{ticker}"
+    
+    # Check Redis cache first
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                print(f"Using Redis cached info for {ticker}")
+                return json.loads(cached)
+        except Exception as e:
+            print(f"Redis cache read failed: {e}")
+    
+    # Fallback to local cache
     if ticker in _stock_info_cache:
+        print(f"Using local cached info for {ticker}")
         return _stock_info_cache[ticker]
     
     max_retries = 3
@@ -490,7 +550,13 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
                 result['is_futures'] = True
                 # Add gram equivalent (1 troy ounce = 31.1035 grams)
                 result['grams'] = 31.1035
-            # Cache result locally
+            # Cache result in Redis (15 min TTL)
+            if redis_client:
+                try:
+                    redis_client.setex(cache_key, 900, json.dumps(result))
+                except Exception as e:
+                    print(f"Redis cache write failed: {e}")
+            # Also cache locally as fallback
             _stock_info_cache[ticker] = result
             return result
         except Exception as e:
