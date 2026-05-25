@@ -394,6 +394,83 @@ def analyze_stock(ticker: str) -> Optional[Dict]:
     return indicators
 
 
+def calculate_signal_score(current_price: float, open_price: float, 
+                           previous_close: float, percent_change: float,
+                           high: float = None, low: float = None) -> tuple:
+    """
+    Calculate signal score based on multiple factors:
+    Returns (signal, score, reasoning)
+    """
+    score = 0
+    reasons = []
+    
+    # Factor 1: Daily percent change (momentum)
+    if percent_change > 3:
+        score += 3
+        reasons.append("Strong upward momentum (+3%)")
+    elif percent_change > 1.5:
+        score += 2
+        reasons.append("Positive momentum (+1.5%)")
+    elif percent_change > 0.5:
+        score += 1
+        reasons.append("Slight upward trend")
+    elif percent_change < -3:
+        score -= 3
+        reasons.append("Strong downward momentum (-3%)")
+    elif percent_change < -1.5:
+        score -= 2
+        reasons.append("Negative momentum (-1.5%)")
+    elif percent_change < -0.5:
+        score -= 1
+        reasons.append("Slight downward trend")
+    
+    # Factor 2: Price vs Open (intraday trend)
+    if current_price > open_price * 1.02:
+        score += 2
+        reasons.append("Strong intraday gain")
+    elif current_price > open_price:
+        score += 1
+        reasons.append("Above opening price")
+    elif current_price < open_price * 0.98:
+        score -= 2
+        reasons.append("Strong intraday loss")
+    elif current_price < open_price:
+        score -= 1
+        reasons.append("Below opening price")
+    
+    # Factor 3: Price vs Previous Close (trend continuation)
+    if current_price > previous_close * 1.01:
+        score += 1
+        reasons.append("Above previous close")
+    elif current_price < previous_close * 0.99:
+        score -= 1
+        reasons.append("Below previous close")
+    
+    # Factor 4: Position within daily range
+    if high and low and high > low:
+        range_position = (current_price - low) / (high - low)
+        if range_position > 0.8:
+            score += 1
+            reasons.append("Near daily high")
+        elif range_position < 0.2:
+            score -= 1
+            reasons.append("Near daily low")
+    
+    # Determine signal
+    if score >= 4:
+        signal = "Strong Buy"
+    elif score >= 2:
+        signal = "Buy"
+    elif score <= -4:
+        signal = "Strong Sell"
+    elif score <= -2:
+        signal = "Sell"
+    else:
+        signal = "Hold"
+    
+    return signal, score, reasons
+
+
 def get_all_signals() -> List[Dict]:
     """Get signals for all stocks in watchlist using Finnhub (fast, no rate limiting)"""
     signals = []
@@ -403,17 +480,17 @@ def get_all_signals() -> List[Dict]:
         # Use Finnhub for fast, rate-limit-free data
         stock_info = get_stock_info_finnhub(ticker)
         if stock_info:
-            # Add basic signal based on price change
             current_price = stock_info.get('current_price')
             percent_change = stock_info.get('percent_change', 0)
+            open_price = stock_info.get('open', current_price)
+            previous_close = stock_info.get('previous_close', current_price)
+            high = stock_info.get('high')
+            low = stock_info.get('low')
             
-            # Simple signal logic based on percent change
-            if percent_change > 2:
-                signal = "BUY"
-            elif percent_change < -2:
-                signal = "SELL"
-            else:
-                signal = "HOLD"
+            # Use shared signal calculation
+            signal, score, reasons = calculate_signal_score(
+                current_price, open_price, previous_close, percent_change, high, low
+            )
             
             result = {
                 'ticker': ticker,
@@ -673,6 +750,25 @@ def predict_stock(ticker: str) -> Optional[Dict]:
         # Calculate weighted prediction score
         score = 0
         factors = []
+        
+        # Add daily signal score for alignment with main page (weight: 1.0)
+        # Fetch daily data from Finnhub for consistent scoring
+        try:
+            stock_info = get_stock_info_finnhub(ticker)
+            if stock_info:
+                daily_signal, daily_score, daily_reasons = calculate_signal_score(
+                    stock_info.get('current_price', current_price),
+                    stock_info.get('open', current_price),
+                    stock_info.get('previous_close', current_price),
+                    stock_info.get('percent_change', 0),
+                    stock_info.get('high'),
+                    stock_info.get('low')
+                )
+                # Add daily score as weighted factor
+                score += daily_score * 0.5
+                factors.extend([f"Daily: {r}" for r in daily_reasons[:2]])  # Add up to 2 daily reasons
+        except Exception as e:
+            print(f"Could not add daily signal score: {e}")
         
         # RSI analysis (weight: 1.5)
         if rsi < 30:
