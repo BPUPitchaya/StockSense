@@ -201,20 +201,24 @@ def get_categories():
 @app.get("/signals")
 def get_signals(category: Optional[str] = None):
     """Get trading signals for watchlist stocks - FAST version using Finnhub"""
-    cache_key = get_cache_key("signals_fast", category=category or "all")
+    cache_key = get_cache_key("signals_v3", category=category or "all")  # v3 - numpy-free
     cached_data = get_from_cache(cache_key)
     if cached_data:
+        print(f"Returning {len(cached_data)} cached signals")
         return cached_data
     
     try:
         # Use fast Finnhub-based signals (no rate limiting)
         all_signals_data = signals.get_all_signals()
+        print(f"Generated {len(all_signals_data)} signals, caching...")
         
         # Return raw data directly (faster, no validation overhead)
-        set_cache(cache_key, all_signals_data)  # Cache uses default 5 min duration
+        set_cache(cache_key, all_signals_data)
         return all_signals_data
     except Exception as e:
         print(f"Error in get_signals: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predictions")
