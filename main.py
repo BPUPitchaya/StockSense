@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import database
@@ -8,6 +9,24 @@ from datetime import datetime, timedelta
 import time
 import jwt
 import os
+import json
+import numpy as np
+
+class NumpySafeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+def clean_for_json(data):
+    """Strip numpy types by round-tripping through JSON"""
+    return json.loads(json.dumps(data, cls=NumpySafeEncoder))
 
 app = FastAPI()
 
@@ -201,7 +220,7 @@ def get_categories():
 @app.get("/signals")
 def get_signals(category: Optional[str] = None):
     """Get trading signals for watchlist stocks - FAST version using Finnhub"""
-    cache_key = get_cache_key("signals_v3", category=category or "all")  # v3 - numpy-free
+    cache_key = get_cache_key("signals_5stocks", category=category or "all")  # 5 stocks only
     cached_data = get_from_cache(cache_key)
     if cached_data:
         print(f"Returning {len(cached_data)} cached signals")
@@ -212,13 +231,12 @@ def get_signals(category: Optional[str] = None):
         all_signals_data = signals.get_all_signals()
         print(f"Generated {len(all_signals_data)} signals, caching...")
         
-        # Return raw data directly (faster, no validation overhead)
-        set_cache(cache_key, all_signals_data)
-        return all_signals_data
+        # Strip all numpy types before caching and returning
+        clean_data = clean_for_json(all_signals_data)
+        set_cache(cache_key, clean_data)
+        return clean_data
     except Exception as e:
         print(f"Error in get_signals: {e}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predictions")
