@@ -467,7 +467,7 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
 
 def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
     """Get stock information from Finnhub API (more reliable for current price and company info)"""
-    cache_key = f"stock_info_finnhub:{ticker}"
+    cache_key = f"stock_info_finnhub_v2:{ticker}"
     
     # Check Redis cache first
     if redis_client:
