@@ -498,6 +498,7 @@ def get_all_signals() -> List[Dict]:
             
             result = {
                 'ticker': ticker,
+                'name': stock_info.get('name'),  # Company full name
                 'current_price': current_price,
                 'signal': signal,
                 'change': stock_info.get('change'),
@@ -548,7 +549,7 @@ def get_stock_history(ticker: str, period: str = "3mo") -> Optional[List[Dict]]:
 
 def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
     """Get stock information from Finnhub API (more reliable for current price and company info)"""
-    cache_key = f"stock_info_finnhub_v2:{ticker}"
+    cache_key = f"stock_info_finnhub_v3:{ticker}"  # v3 includes company name
     
     # Check Redis cache first
     if redis_client:
@@ -586,6 +587,7 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Add profile data if available
         if profile:
             result.update({
+                'name': profile.get('name'),  # Company full name
                 'market_cap': profile.get('marketCapitalization'),
                 'pe_ratio': profile.get('pe'),
                 'dividend_yield': profile.get('dividendYield'),
