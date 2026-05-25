@@ -24,7 +24,7 @@ FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
 # Redis cache connection
-REDIS_URL = os.getenv('REDIS_URL', 'redis://red-d89tjhq8qa3s73eb4320:6379')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://red-d89tjhq8qa3s73eb4320:JZGjlPWddeVHixHr7rcMBWuHt9Z7mhPD@red-d89tjhq8qa3s73eb4320:6379')
 try:
     redis_client = redis.from_url(REDIS_URL, decode_responses=True)
     redis_client.ping()  # Test connection
@@ -394,15 +394,48 @@ def analyze_stock(ticker: str) -> Optional[Dict]:
 
 
 def get_all_signals() -> List[Dict]:
-    """Get signals for all stocks in watchlist"""
+    """Get signals for all stocks in watchlist using Finnhub (fast, no rate limiting)"""
     signals = []
     
     for ticker in WATCHLIST:
         print(f"Analyzing {ticker}...")
-        result = analyze_stock(ticker)
-        if result:
+        # Use Finnhub for fast, rate-limit-free data
+        stock_info = get_stock_info_finnhub(ticker)
+        if stock_info:
+            # Add basic signal based on price change
+            current_price = stock_info.get('current_price')
+            percent_change = stock_info.get('percent_change', 0)
+            
+            # Simple signal logic based on percent change
+            if percent_change > 2:
+                signal = "BUY"
+            elif percent_change < -2:
+                signal = "SELL"
+            else:
+                signal = "HOLD"
+            
+            result = {
+                'ticker': ticker,
+                'current_price': current_price,
+                'signal': signal,
+                'change': stock_info.get('change'),
+                'percent_change': percent_change,
+                'high': stock_info.get('high'),
+                'low': stock_info.get('low'),
+                'open': stock_info.get('open'),
+                'previous_close': stock_info.get('previous_close'),
+                'market_cap': stock_info.get('market_cap'),
+                'pe_ratio': stock_info.get('pe_ratio'),
+                'beta': stock_info.get('beta'),
+                'eps': stock_info.get('eps'),
+                '52_week_high': stock_info.get('52_week_high'),
+                '52_week_low': stock_info.get('52_week_low'),
+                'industry': stock_info.get('industry'),
+                'sector': stock_info.get('sector'),
+                'description': stock_info.get('description'),
+            }
             signals.append(result)
-        time.sleep(3.0)  # 3 second delay between stocks (Finnhub doesn't need much delay)
+        # No delay needed for Finnhub
     
     return signals
 
