@@ -487,6 +487,7 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         
         # Get company profile
         profile = finnhub_client.company_profile2(symbol=ticker)
+        print(f"Finnhub profile for {ticker}: {profile}")
         
         # Build result with Finnhub data (no yfinance dependency for speed)
         result = {
