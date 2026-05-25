@@ -8,3 +8,4 @@ psycopg2-binary
 sqlalchemy
 finnhub-python
 PyJWT
+redis==5.0.0
