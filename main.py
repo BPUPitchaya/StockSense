@@ -241,26 +241,40 @@ def get_signals(category: Optional[str] = None):
 
 @app.get("/predictions")
 def get_predictions(category: Optional[str] = None, authorization: str = Header(...)):
-    """Get all predictions with gainers and losers for the user's watchlist"""
+    """Get predictions using same fast signals as main page for consistency"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        # Get user's watchlist
+        # Use same fast signals as main page for consistency
         watchlist = database.get_personal_watchlist(user_id=user_id)
         if not watchlist:
             watchlist = signals.WATCHLIST
         
-        # Use watchlist in cache key to make it user-specific
+        # Use unified cache key
         watchlist_key = ",".join(sorted(watchlist))
-        cache_key = get_cache_key("predictions", category=category or "all", watchlist=watchlist_key[:50])
+        cache_key = get_cache_key("predictions_unified", category=category or "all", watchlist=watchlist_key[:50])
         cached_data = get_from_cache(cache_key)
         if cached_data:
             return cached_data
         
-        predictions = signals.get_all_predictions(category=category, watchlist=watchlist)
-        set_cache(cache_key, predictions)
-        return predictions
+        # Use FAST signals (same as /signals endpoint) for consistency
+        all_signals = signals.get_all_signals()
+        
+        # Sort by percent_change for gainers/losers
+        sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+        
+        # Format as predictions response
+        predictions = {
+            'gainers': sorted_signals[:3],  # Top 3
+            'losers': sorted_signals[-3:] if len(sorted_signals) >= 3 else sorted_signals,  # Bottom 3
+            'all_signals': sorted_signals,
+            'count': len(sorted_signals)
+        }
+        
+        clean_predictions = clean_for_json(predictions)
+        set_cache(cache_key, clean_predictions)
+        return clean_predictions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
