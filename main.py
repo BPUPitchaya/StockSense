@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import database
 import signals
@@ -64,11 +64,12 @@ class WatchlistRequest(BaseModel):
 class Signal(BaseModel):
     ticker: str
     current_price: float
-    ma50: Optional[float] = None
-    ma200: Optional[float] = None
-    rsi: Optional[float] = None
+    ma50: Optional[float] = Field(default=None)
+    ma200: Optional[float] = Field(default=None)
+    rsi: Optional[float] = Field(default=None)
     signal: str
     date: str
+    name: Optional[str] = Field(default=None)  # Company full name
 
 # Simple in-memory cache
 cache: Dict[str, tuple] = {}
@@ -197,10 +198,10 @@ def get_categories():
     """Get available stock categories"""
     return {"categories": list(signals.CATEGORIES.keys())}
 
-@app.get("/signals", response_model=List[Signal])
+@app.get("/signals")
 def get_signals(category: Optional[str] = None):
     """Get trading signals for watchlist stocks - FAST version using Finnhub"""
-    cache_key = get_cache_key("signals_v2", category=category or "all")
+    cache_key = get_cache_key("signals_fast", category=category or "all")
     cached_data = get_from_cache(cache_key)
     if cached_data:
         return cached_data
@@ -209,23 +210,11 @@ def get_signals(category: Optional[str] = None):
         # Use fast Finnhub-based signals (no rate limiting)
         all_signals_data = signals.get_all_signals()
         
-        # Map to Signal model
-        all_signals = []
-        for stock_data in all_signals_data:
-            signal = Signal(
-                ticker=stock_data.get('ticker', ''),
-                current_price=stock_data.get('current_price', 0.0),
-                ma50=stock_data.get('ma50'),
-                ma200=stock_data.get('ma200'),
-                rsi=stock_data.get('rsi'),
-                signal=stock_data.get('signal', 'HOLD'),
-                date=datetime.utcnow().strftime('%Y-%m-%d')
-            )
-            all_signals.append(signal)
-        
-        set_cache(cache_key, all_signals, ttl=300)  # Cache for 5 minutes
-        return all_signals
+        # Return raw data directly (faster, no validation overhead)
+        set_cache(cache_key, all_signals_data, ttl=300)  # Cache for 5 minutes
+        return all_signals_data
     except Exception as e:
+        print(f"Error in get_signals: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predictions")
