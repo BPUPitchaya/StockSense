@@ -211,7 +211,7 @@ def get_signals(category: Optional[str] = None):
         all_signals_data = signals.get_all_signals()
         
         # Return raw data directly (faster, no validation overhead)
-        set_cache(cache_key, all_signals_data, ttl=300)  # Cache for 5 minutes
+        set_cache(cache_key, all_signals_data)  # Cache uses default 5 min duration
         return all_signals_data
     except Exception as e:
         print(f"Error in get_signals: {e}")
