@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import os
 import json
+from io import StringIO
 import finnhub
 import redis
 
@@ -215,7 +216,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
             cached = redis_client.get(cache_key)
             if cached:
                 print(f"Using Redis cached history for {ticker}")
-                return pd.read_json(cached)
+                return pd.read_json(StringIO(cached))
         except Exception as e:
             print(f"Redis cache read failed: {e}")
     
@@ -487,9 +488,8 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Get company profile
         profile = finnhub_client.company_profile2(symbol=ticker)
         
-        yfinance_info = None
-        
-        return {
+        # Build result with Finnhub data (no yfinance dependency for speed)
+        result = {
             'ticker': ticker,
             'current_price': quote.get('c'),  # Current price
             'change': quote.get('d'),  # Change
@@ -498,24 +498,26 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             'low': quote.get('l'),  # Low of the day
             'open': quote.get('o'),  # Open price
             'previous_close': quote.get('pc'),  # Previous close
-            'market_cap': profile.get('marketCapitalization') if profile else None,
-            'pe_ratio': yfinance_info.get('pe_ratio') if yfinance_info else profile.get('pe') if profile else None,
-            'dividend_yield': yfinance_info.get('dividend_yield') if yfinance_info else profile.get('dividendYield') if profile else None,
-            'dividend_rate': yfinance_info.get('dividend_rate') if yfinance_info else None,
-            'beta': yfinance_info.get('beta') if yfinance_info else profile.get('beta') if profile else None,
-            'eps': yfinance_info.get('eps') if yfinance_info else profile.get('eps') if profile else None,
-            'avg_volume': yfinance_info.get('avg_volume') if yfinance_info else None,
-            '52_week_high': yfinance_info.get('52_week_high') if yfinance_info else profile.get('52WeekHigh') if profile else None,
-            '52_week_low': yfinance_info.get('52_week_low') if yfinance_info else profile.get('52WeekLow') if profile else None,
-            'profit_margin': yfinance_info.get('profit_margin') if yfinance_info else None,
-            'industry': profile.get('industry') if profile else (yfinance_info.get('industry') if yfinance_info else None),
-            'sector': profile.get('sector') if profile else (yfinance_info.get('sector') if yfinance_info else None),
-            'description': profile.get('description') if profile else (yfinance_info.get('longBusinessSummary') if yfinance_info else None),
-            'country': profile.get('country') if profile else None,
-            'exchange': profile.get('exchange') if profile else None,
-            'currency': profile.get('currency') if profile else None,
             'source': 'finnhub'
         }
+        
+        # Add profile data if available
+        if profile:
+            result.update({
+                'market_cap': profile.get('marketCapitalization'),
+                'pe_ratio': profile.get('pe'),
+                'dividend_yield': profile.get('dividendYield'),
+                'beta': profile.get('beta'),
+                'eps': profile.get('eps'),
+                '52_week_high': profile.get('52WeekHigh'),
+                '52_week_low': profile.get('52WeekLow'),
+                'industry': profile.get('industry'),
+                'sector': profile.get('sector'),
+                'description': profile.get('description'),
+                'country': profile.get('country'),
+                'exchange': profile.get('exchange'),
+                'currency': profile.get('currency'),
+            })
         # Cache result in Redis (15 min TTL)
         if redis_client:
             try:
