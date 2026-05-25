@@ -426,7 +426,7 @@ def get_budget(authorization: str = Header(...)):
 
 @app.get("/budget-recommendations")
 def get_budget_recommendations(authorization: str = Header(...)):
-    """Get budget recommendations with stock allocations"""
+    """Get budget recommendations with stock allocations - fast version using daily signals"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
@@ -441,34 +441,35 @@ def get_budget_recommendations(authorization: str = Header(...)):
                 "message": "Please set a budget to get recommendations"
             }
         
-        # Get watchlist
-        watchlist = database.get_personal_watchlist(user_id=user_id)
-        if not watchlist:
-            watchlist = signals.WATCHLIST
+        # Use fast signals for all 30+ stocks (no rate limiting)
+        all_signals = signals.get_all_signals()
         
-        # Get predictions for watchlist stocks
-        all_signals = []
-        for ticker in watchlist[:10]:  # Check up to 10 stocks
-            try:
-                pred = signals.predict_stock(ticker)
-                if pred and pred.get('prediction') in ['Buy', 'Strong Buy']:
-                    all_signals.append(pred)
-            except:
-                continue
+        # Filter for Buy/Strong Buy signals only
+        buy_signals = [s for s in all_signals if s.get('signal') in ['Buy', 'Strong Buy']]
         
-        # Sort by score
-        all_signals.sort(key=lambda x: x.get('score', 0), reverse=True)
+        # Sort by percent change (highest momentum first)
+        buy_signals.sort(key=lambda x: x.get('percent_change', 0), reverse=True)
         
         # Calculate allocations
-        top_picks = all_signals[:5]  # Top 5 picks
-        total_score = sum(s.get('score', 1) for s in top_picks) or 1
+        top_picks = buy_signals[:5]  # Top 5 picks
+        if not top_picks:
+            return {
+                "total_budget": budget,
+                "total_allocated": 0.0,
+                "remaining_budget": budget,
+                "recommendations": [],
+                "message": "No Buy/Strong Buy stocks found. Check back later when market conditions improve."
+            }
+        
+        # Use percent change as score for allocation
+        total_score = sum(s.get('percent_change', 1) for s in top_picks) or 1
         
         stock_recommendations = []
         total_allocated = 0.0
         
         for signal in top_picks:
-            score = signal.get('score', 1)
-            allocation_pct = score / total_score
+            score = signal.get('percent_change', 1)
+            allocation_pct = score / total_score if total_score > 0 else 1 / len(top_picks)
             amount = budget * allocation_pct * 0.8  # Use 80% of budget, keep 20% cash
             
             current_price = signal.get('current_price', 0)
@@ -476,15 +477,16 @@ def get_budget_recommendations(authorization: str = Header(...)):
             
             stock_recommendations.append({
                 'ticker': signal.get('ticker'),
-                'prediction': signal.get('prediction'),
+                'prediction': signal.get('signal'),  # Buy or Strong Buy
                 'current_price': current_price,
                 'shares': shares,
                 'actual_amount': amount,
                 'allocation_percentage': allocation_pct * 100,
-                'confidence': signal.get('confidence', 50),
+                'confidence': min(abs(signal.get('percent_change', 0)) * 10 + 50, 95),  # Higher confidence for bigger moves
                 'score': score,
-                'potential_change': signal.get('potential_change', 0),
-                'factors': signal.get('factors', [])
+                'potential_change': signal.get('percent_change', 0),
+                'factors': [f"Daily momentum: {signal.get('percent_change', 0):.2f}%", 
+                           f"Price: ${current_price:.2f}"]
             })
             total_allocated += amount
         
@@ -493,7 +495,7 @@ def get_budget_recommendations(authorization: str = Header(...)):
             "total_allocated": total_allocated,
             "remaining_budget": budget - total_allocated,
             "recommendations": stock_recommendations,
-            "message": f"Based on your ${budget:.2f} budget, here are top {len(stock_recommendations)} stock picks"
+            "message": f"Based on your ${budget:.2f} budget, here are {len(stock_recommendations)} top momentum picks"
         }
     except HTTPException:
         raise

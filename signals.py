@@ -12,9 +12,13 @@ from io import StringIO
 import finnhub
 import redis
 
-# Categorized watchlist for selective loading (5 stocks to avoid rate limiting while enabling detailed info)
+# Categorized watchlist for selective loading (30 stocks for more investment options)
 CATEGORIES = {
     "Top Stocks": ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"],
+    "Tech Growth": ["AMZN", "META", "NFLX", "CRM", "ADBE", "ORCL", "INTC", "AMD"],
+    "Finance": ["JPM", "BAC", "GS", "V", "MA", "AXP"],
+    "Healthcare": ["JNJ", "PFE", "UNH", "ABBV", "MRK"],
+    "Consumer": ["WMT", "HD", "PG", "KO", "DIS"],
 }
 
 # Flat watchlist for backward compatibility
