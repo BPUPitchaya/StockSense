@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/signal.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 import 'stock_detail_screen.dart';
 
 class SignalsScreen extends StatefulWidget {
@@ -19,10 +20,6 @@ class _SignalsScreenState extends State<SignalsScreen> {
   bool isSearching = false;
   List<String> personalWatchlist = [];
   Map<String, bool> inWatchlist = {};
-  String _currency = 'USD';
-  String _currencySymbol = '\$';
-  Map<String, dynamic> _exchangeRates = {};
-
   @override
   void initState() {
     super.initState();
@@ -33,30 +30,13 @@ class _SignalsScreenState extends State<SignalsScreen> {
   Future<void> _loadAll() async {
     setState(() { isLoading = true; error = null; searchedSignal = null; });
     try {
-      final loadedSignals = await ApiService.getSignals();
-      // Load currency info in parallel, but don't fail if it errors
-      String currency = 'USD';
-      String symbol = '\$';
-      Map<String, dynamic> rates = {};
-      try {
-        final currencyResults = await Future.wait([
-          ApiService.getUserCurrency(),
-          ApiService.getExchangeRates(),
-        ]);
-        final userCurrency = currencyResults[0] as Map<String, dynamic>;
-        final ratesData = currencyResults[1] as Map<String, dynamic>;
-        currency = userCurrency['currency'] ?? 'USD';
-        symbol = userCurrency['symbol'] ?? '\$';
-        rates = (ratesData['rates'] as Map<String, dynamic>?) ?? {};
-      } catch (_) {
-        // Fall back to USD if currency fetch fails
-      }
+      final results = await Future.wait([
+        ApiService.getSignals(),
+        CurrencyService.load(),
+      ]);
       if (mounted) {
         setState(() {
-          signals = loadedSignals;
-          _currency = currency;
-          _currencySymbol = symbol;
-          _exchangeRates = rates;
+          signals = results[0] as List<Signal>;
           isLoading = false;
         });
       }
@@ -67,18 +47,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
     }
   }
 
-  double _convertPrice(double usdPrice) {
-    if (_currency == 'USD' || !_exchangeRates.containsKey(_currency)) return usdPrice;
-    return usdPrice * (_exchangeRates[_currency] as num).toDouble();
-  }
-
-  String _formatPrice(double usdPrice) {
-    final converted = _convertPrice(usdPrice);
-    if (_currency == 'JPY' || _currency == 'KRW') {
-      return '$_currencySymbol${converted.toStringAsFixed(0)}';
-    }
-    return '$_currencySymbol${converted.toStringAsFixed(2)}';
-  }
+  String _formatPrice(double usdPrice) => CurrencyService.format(usdPrice);
 
   Future<void> _loadSignals() => _loadAll();
 

@@ -4,7 +4,6 @@ class CurrencyService {
   static String _currency = 'USD';
   static String _symbol = '\$';
   static Map<String, dynamic> _rates = {};
-  static bool _loaded = false;
 
   static String get currency => _currency;
   static String get symbol => _symbol;
@@ -20,16 +19,12 @@ class CurrencyService {
       _currency = userCurrency['currency'] ?? 'USD';
       _symbol = userCurrency['symbol'] ?? '\$';
       _rates = (ratesData['rates'] as Map<String, dynamic>?) ?? {};
-      _loaded = true;
     } catch (_) {
-      _loaded = true;
+      // Keep existing values on failure
     }
   }
 
-  static Future<void> reload() async {
-    _loaded = false;
-    await load();
-  }
+  static Future<void> reload() => load();
 
   static double convert(double usdPrice) {
     if (_currency == 'USD' || !_rates.containsKey(_currency)) return usdPrice;
@@ -43,6 +38,4 @@ class CurrencyService {
     }
     return '$_symbol${converted.toStringAsFixed(2)}';
   }
-
-  static bool get isLoaded => _loaded;
 }
