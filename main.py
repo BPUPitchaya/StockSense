@@ -11,6 +11,8 @@ import jwt
 import os
 import json
 import numpy as np
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 class NumpySafeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -90,9 +92,11 @@ class Signal(BaseModel):
     date: str
     name: Optional[str] = Field(default=None)  # Company full name
 
-# Simple in-memory cache
-cache: Dict[str, tuple] = {}
-CACHE_DURATION = 300  # 5 minutes
+# Simple in-memory cache with stale-while-revalidate
+_cache: Dict[str, tuple] = {}
+CACHE_DURATION = 600  # 10 minutes - data considered fresh
+STALE_DURATION = 1800  # 30 minutes - stale but usable data
+_refresh_executor = ThreadPoolExecutor(max_workers=2)
 
 def get_cache_key(prefix: str, **kwargs) -> str:
     """Generate a cache key"""
@@ -101,24 +105,58 @@ def get_cache_key(prefix: str, **kwargs) -> str:
         key_parts.append(f"{k}={v}")
     return ":".join(key_parts)
 
-def get_from_cache(key: str) -> Optional[Any]:
-    """Get data from cache if still valid"""
-    if key in cache:
-        data, timestamp = cache[key]
-        if time.time() - timestamp < CACHE_DURATION:
-            return data
+def get_from_cache(key: str, allow_stale: bool = False) -> tuple[Optional[Any], bool]:
+    """
+    Get data from cache.
+    Returns: (data, is_fresh) - is_fresh is False if stale but usable
+    """
+    if key in _cache:
+        data, timestamp = _cache[key]
+        age = time.time() - timestamp
+        
+        if age < CACHE_DURATION:
+            return data, True  # Fresh
+        elif allow_stale and age < STALE_DURATION:
+            return data, False  # Stale but usable
         else:
-            del cache[key]
-    return None
+            del _cache[key]
+    return None, False
 
 def set_cache(key: str, data: Any) -> None:
     """Set data in cache"""
-    cache[key] = (data, time.time())
+    _cache[key] = (data, time.time())
+
+def refresh_cache_async(key: str, refresh_func, *args, **kwargs):
+    """Refresh cache in background"""
+    def _refresh():
+        try:
+            new_data = refresh_func(*args, **kwargs)
+            if new_data:
+                set_cache(key, clean_for_json(new_data))
+                print(f"Background refresh completed for {key}")
+        except Exception as e:
+            print(f"Background refresh failed for {key}: {e}")
+    
+    _refresh_executor.submit(_refresh)
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize database on startup"""
+    """Initialize database and warm up cache"""
     database.init_db()
+    
+    # Warm up cache on startup (background)
+    def warm_cache():
+        try:
+            print("Warming up signals cache...")
+            data = signals.get_all_signals()
+            if data:
+                cache_key = get_cache_key("signals_5stocks", category="all")
+                set_cache(cache_key, clean_for_json(data))
+                print(f"Cache warmed with {len(data)} signals")
+        except Exception as e:
+            print(f"Cache warm-up failed: {e}")
+    
+    threading.Thread(target=warm_cache, daemon=True).start()
 
 @app.get("/")
 def read_root():
@@ -219,19 +257,26 @@ def get_categories():
 
 @app.get("/signals")
 def get_signals(category: Optional[str] = None):
-    """Get trading signals for watchlist stocks - FAST version using Finnhub"""
-    cache_key = get_cache_key("signals_5stocks", category=category or "all")  # 5 stocks only
-    cached_data = get_from_cache(cache_key)
-    if cached_data:
-        print(f"Returning {len(cached_data)} cached signals")
-        return cached_data
+    """Get trading signals - instant with stale-while-revalidate"""
+    cache_key = get_cache_key("signals_5stocks", category=category or "all")
     
+    # Try to get from cache (allow stale for instant response)
+    cached_data, is_fresh = get_from_cache(cache_key, allow_stale=True)
+    
+    if cached_data:
+        if is_fresh:
+            print(f"Returning {len(cached_data)} FRESH cached signals")
+            return cached_data
+        else:
+            # Stale data - return immediately, refresh in background
+            print(f"Returning {len(cached_data)} STALE signals (refreshing in background)")
+            refresh_cache_async(cache_key, signals.get_all_signals)
+            return cached_data
+    
+    # No cache - must fetch (this is the slow path on cold start)
     try:
-        # Use fast Finnhub-based signals (no rate limiting)
         all_signals_data = signals.get_all_signals()
-        print(f"Generated {len(all_signals_data)} signals, caching...")
-        
-        # Strip all numpy types before caching and returning
+        print(f"Generated {len(all_signals_data)} signals (cold start)")
         clean_data = clean_for_json(all_signals_data)
         set_cache(cache_key, clean_data)
         return clean_data
@@ -251,14 +296,33 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         if not watchlist:
             watchlist = signals.WATCHLIST
         
-        # Use unified cache key
+        # Use unified cache key with stale-while-revalidate
         watchlist_key = ",".join(sorted(watchlist))
         cache_key = get_cache_key("predictions_unified", category=category or "all", watchlist=watchlist_key[:50])
-        cached_data = get_from_cache(cache_key)
-        if cached_data:
-            return cached_data
+        cached_data, is_fresh = get_from_cache(cache_key, allow_stale=True)
         
-        # Use FAST signals (same as /signals endpoint) for consistency
+        if cached_data:
+            if is_fresh:
+                return cached_data
+            else:
+                # Stale - refresh in background
+                def refresh_predictions():
+                    try:
+                        all_signals = signals.get_all_signals()
+                        sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+                        predictions = {
+                            'gainers': sorted_signals[:3],
+                            'losers': sorted_signals[-3:] if len(sorted_signals) >= 3 else sorted_signals,
+                            'all_signals': sorted_signals,
+                            'count': len(sorted_signals)
+                        }
+                        set_cache(cache_key, clean_for_json(predictions))
+                    except Exception as e:
+                        print(f"Background refresh predictions failed: {e}")
+                _refresh_executor.submit(refresh_predictions)
+                return cached_data
+        
+        # Cold start - fetch fresh
         all_signals = signals.get_all_signals()
         
         # Sort by percent_change for gainers/losers
