@@ -35,13 +35,13 @@ def signal_to_prediction(signal_data):
     signal = signal_data.get('signal', 'HOLD')
     percent_change = signal_data.get('percent_change', 0) or 0
     
-    # Map signal to prediction text
+    # Map signal to prediction text (calculate_signal_score returns Title Case)
     prediction_map = {
-        'STRONG BUY': 'STRONG BUY',
-        'BUY': 'BUY',
-        'HOLD': 'HOLD',
-        'SELL': 'SELL',
-        'STRONG SELL': 'STRONG SELL'
+        'Strong Buy': 'STRONG BUY',
+        'Buy': 'BUY',
+        'Hold': 'HOLD',
+        'Sell': 'SELL',
+        'Strong Sell': 'STRONG SELL'
     }
     prediction = prediction_map.get(signal, 'HOLD')
     
