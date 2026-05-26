@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 
 class PredictionsScreen extends StatefulWidget {
   const PredictionsScreen({super.key});
@@ -23,6 +24,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     super.initState();
     _loadPredictions();
     _loadPersonalWatchlist();
+    CurrencyService.load().then((_) { if (mounted) setState(() {}); });
   }
 
   Future<void> _loadPredictions() async {
@@ -358,7 +360,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   const Icon(Icons.attach_money, size: 18, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    'Current: \$${prediction['current_price'].toStringAsFixed(2)}',
+                    'Current: ${CurrencyService.format((prediction['current_price'] as num).toDouble())}',
                     style: const TextStyle(fontSize: 15),
                   ),
                 ],

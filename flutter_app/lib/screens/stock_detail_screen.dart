@@ -4,6 +4,7 @@ import '../models/signal.dart';
 import '../models/historical_data.dart';
 import '../models/position.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 
 class StockDetailScreen extends StatefulWidget {
   final Signal signal;
@@ -32,6 +33,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     super.initState();
     _loadData();
     _loadPersonalWatchlist();
+    CurrencyService.load().then((_) { if (mounted) setState(() {}); });
   }
 
   Future<void> _loadData() async {
@@ -411,7 +413,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 ),
               ),
             const SizedBox(height: 16),
-            Text('Current Price: \$${widget.signal.currentPrice.toStringAsFixed(2)}'),
+            Text('Current Price: ${CurrencyService.format(widget.signal.currentPrice)}'),
             if (stockInfo != null && stockInfo!['unit'] != null)
               Text('Unit: ${stockInfo!['unit']}'),
             if (stockInfo != null && stockInfo!['grams'] != null)
@@ -419,9 +421,9 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             if (stockInfo != null && stockInfo!['currency'] != null)
               Text('Currency: ${stockInfo!['currency']}'),
             if (widget.signal.ma50 != null)
-              Text('50-day MA: \$${widget.signal.ma50!.toStringAsFixed(2)}'),
+              Text('50-day MA: ${CurrencyService.format(widget.signal.ma50!)}'),
             if (widget.signal.ma200 != null)
-              Text('200-day MA: \$${widget.signal.ma200!.toStringAsFixed(2)}'),
+              Text('200-day MA: ${CurrencyService.format(widget.signal.ma200!)}'),
             if (widget.signal.rsi != null)
               Text('RSI: ${widget.signal.rsi!.toStringAsFixed(2)}'),
             const SizedBox(height: 16),
@@ -485,7 +487,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                         reservedSize: 60,
                         getTitlesWidget: (value, meta) {
                           return Text(
-                            '\$${value.toInt()}',
+                            '${CurrencyService.symbol}${CurrencyService.convert(value).toInt()}',
                             style: const TextStyle(fontSize: 10),
                           );
                         },
@@ -552,7 +554,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             if (historicalData.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Data Points: ${historicalData.length}'),
-              Text('Price Range: \$${historicalData.map((d) => d.low).reduce((a, b) => a < b ? a : b).toStringAsFixed(2)} - \$${historicalData.map((d) => d.high).reduce((a, b) => a > b ? a : b).toStringAsFixed(2)}'),
+              Text('Price Range: ${CurrencyService.format(historicalData.map((d) => d.low).reduce((a, b) => a < b ? a : b))} - ${CurrencyService.format(historicalData.map((d) => d.high).reduce((a, b) => a > b ? a : b))}'),
             ],
           ],
         ),
@@ -584,13 +586,13 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               _buildInfoRow('Market Cap', _formatNumber((info['market_cap'] as num) * 1e6)),
             _buildInfoRow('P/E Ratio', info['pe_ratio']?.toStringAsFixed(2) ?? 'N/A'),
             _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${((info['dividend_yield'] as num) * 100).toStringAsFixed(2)}%' : 'N/A'),
-            _buildInfoRow('Dividend Rate', '\$${info['dividend_rate']?.toStringAsFixed(2) ?? 'N/A'}'),
+            _buildInfoRow('Dividend Rate', info['dividend_rate'] != null ? CurrencyService.format((info['dividend_rate'] as num).toDouble()) : 'N/A'),
             _buildInfoRow('Beta', info['beta']?.toStringAsFixed(2) ?? 'N/A'),
-            _buildInfoRow('EPS', '\$${info['eps']?.toStringAsFixed(2) ?? 'N/A'}'),
+            _buildInfoRow('EPS', info['eps'] != null ? CurrencyService.format((info['eps'] as num).toDouble()) : 'N/A'),
             if (info['avg_volume'] != null)
               _buildInfoRow('Avg Volume', _formatNumber(info['avg_volume'])),
-            _buildInfoRow('52-Week High', '\$${info['52_week_high']?.toStringAsFixed(2) ?? 'N/A'}'),
-            _buildInfoRow('52-Week Low', '\$${info['52_week_low']?.toStringAsFixed(2) ?? 'N/A'}'),
+            _buildInfoRow('52-Week High', info['52_week_high'] != null ? CurrencyService.format((info['52_week_high'] as num).toDouble()) : 'N/A'),
+            _buildInfoRow('52-Week Low', info['52_week_low'] != null ? CurrencyService.format((info['52_week_low'] as num).toDouble()) : 'N/A'),
             if (info['profit_margin'] != null)
               _buildInfoRow('Profit Margin', '${(info['profit_margin'] * 100).toStringAsFixed(2)}%'),
             if (info['revenue'] != null)

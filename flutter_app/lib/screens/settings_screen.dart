@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -54,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _updateCurrency(String currency) async {
     try {
       await ApiService.setUserCurrency(currency);
+      await CurrencyService.reload();
       final userCurrency = await ApiService.getUserCurrency();
       
       if (mounted) {

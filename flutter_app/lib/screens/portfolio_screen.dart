@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/position.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 
 class PortfolioScreen extends StatefulWidget {
   const PortfolioScreen({super.key});
@@ -20,6 +21,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   void initState() {
     super.initState();
     _loadPortfolio();
+    CurrencyService.load().then((_) { if (mounted) setState(() {}); });
   }
 
   Future<void> _loadPortfolio() async {
@@ -238,7 +240,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '\$${totalPortfolioValue.toStringAsFixed(2)}',
+                              CurrencyService.format(totalPortfolioValue),
                               style: const TextStyle(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
@@ -279,7 +281,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 8),
-                                        Text('Buy Price: \$${position.buyPrice.toStringAsFixed(2)}'),
+                                        Text('Buy Price: ${CurrencyService.format(position.buyPrice)}'),
                                         Text('Quantity: ${position.quantity.toStringAsFixed(4)}'),
                                         Text('Date: ${position.date}'),
                                       ],

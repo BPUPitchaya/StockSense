@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/currency_service.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -19,6 +20,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   void initState() {
     super.initState();
     _loadBudget();
+    CurrencyService.load().then((_) { if (mounted) setState(() {}); });
   }
 
   Future<void> _loadBudget() async {
@@ -121,7 +123,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       const SizedBox(height: 16),
                       if (_currentBudget > 0)
                         Text(
-                          'Current Budget: \$${_currentBudget.toStringAsFixed(2)}',
+                          'Current Budget: ${CurrencyService.format(_currentBudget)}',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -140,7 +142,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Enter weekly budget amount',
                           border: OutlineInputBorder(),
-                          prefixText: '\$',
+                          prefixText: '${CurrencyService.symbol}',
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -216,15 +218,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Total Budget: \$${(recommendations['total_budget'] ?? 0).toStringAsFixed(2)}',
+              'Total Budget: ${CurrencyService.format(((recommendations['total_budget'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16),
             ),
             Text(
-              'Total Allocated: \$${(recommendations['total_allocated'] ?? 0).toStringAsFixed(2)}',
+              'Total Allocated: ${CurrencyService.format(((recommendations['total_allocated'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16, color: Colors.green),
             ),
             Text(
-              'Remaining: \$${(recommendations['remaining_budget'] ?? 0).toStringAsFixed(2)}',
+              'Remaining: ${CurrencyService.format(((recommendations['remaining_budget'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16, color: Colors.orange),
             ),
             const SizedBox(height: 20),
@@ -277,10 +279,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Current Price: \$${stock['current_price'].toStringAsFixed(2)}'),
+                      Text('Current Price: ${CurrencyService.format((stock['current_price'] as num).toDouble())}'),
                       Text('Shares to Buy: ${stock['shares'].toStringAsFixed(4)}'),
                       Text(
-                        'Amount to Invest: \$${stock['actual_amount'].toStringAsFixed(2)}',
+                        'Amount to Invest: ${CurrencyService.format((stock['actual_amount'] as num).toDouble())}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
