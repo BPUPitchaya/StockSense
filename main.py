@@ -352,17 +352,17 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        # Use same fast signals as main page for consistency
-        watchlist = database.get_personal_watchlist(user_id=user_id)
-        if not watchlist:
-            watchlist = signals.WATCHLIST
+        # Get user's personal watchlist
+        user_watchlist = database.get_personal_watchlist(user_id=user_id)
+        if not user_watchlist:
+            user_watchlist = signals.WATCHLIST
         
-        # Use SAME cache key as /signals for consistency
-        cache_key = get_cache_key("signals_5stocks", category=category or "all")
+        # Use user-specific cache key so each user gets their own predictions
+        watchlist_key = ",".join(sorted(user_watchlist))
+        cache_key = get_cache_key(f"predictions_{user_id}", watchlist=watchlist_key)
         cached_signals, is_fresh = get_from_cache(cache_key, allow_stale=True)
         
         if cached_signals:
-            # Convert cached signals to predictions format
             sorted_signals = sorted(cached_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
             all_predictions = convert_signals_to_predictions(sorted_signals)
             predictions = {
@@ -373,22 +373,22 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
             }
             
             if is_fresh:
-                print(f"Returning {len(all_predictions)} FRESH predictions from shared cache")
+                print(f"Returning {len(all_predictions)} FRESH predictions for user {user_id}")
                 return predictions
             else:
-                # Stale - refresh signals cache in background
-                print(f"Returning {len(all_predictions)} predictions from STALE shared cache (refreshing)")
-                refresh_cache_async(cache_key, signals.get_all_signals)
+                print(f"Returning {len(all_predictions)} STALE predictions for user {user_id} (refreshing)")
+                refresh_cache_async(cache_key, lambda: signals.get_all_signals(watchlist=user_watchlist))
                 return predictions
         
-        # Cold start - fetch fresh signals with retry
+        # Cold start - fetch signals for this user's watchlist
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                all_signals = signals.get_all_signals()
+                all_signals = signals.get_all_signals(watchlist=user_watchlist)
                 if all_signals:
-                    # Sort and convert to predictions format
-                    sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+                    clean_signals = clean_for_json(all_signals)
+                    set_cache(cache_key, clean_signals)
+                    sorted_signals = sorted(clean_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
                     all_predictions = convert_signals_to_predictions(sorted_signals)
                     
                     predictions = {

@@ -502,11 +502,12 @@ def calculate_signal_score(current_price: float, open_price: float,
     return signal, score, reasons
 
 
-def get_all_signals() -> List[Dict]:
+def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
     """Get signals for all stocks in watchlist using Finnhub (fast, no rate limiting)"""
     signals = []
+    target = watchlist if watchlist else WATCHLIST
     
-    for ticker in WATCHLIST:
+    for ticker in target:
         print(f"Analyzing {ticker}...")
         # Use Finnhub for fast, rate-limit-free data
         stock_info = get_stock_info_finnhub(ticker)
