@@ -335,7 +335,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.signal.ticker),
+        title: Text(stockInfo?['name'] ?? widget.signal.ticker),
         actions: [
           IconButton(
             icon: Icon(
@@ -396,12 +396,20 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.signal.ticker,
+              stockInfo?['name'] ?? widget.signal.ticker,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (stockInfo?['name'] != null)
+              Text(
+                widget.signal.ticker,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
             const SizedBox(height: 16),
             Text('Current Price: \$${widget.signal.currentPrice.toStringAsFixed(2)}'),
             if (stockInfo != null && stockInfo!['unit'] != null)
