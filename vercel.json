@@ -1,5 +1,5 @@
 {
-  "buildCommand": "if [ ! -d \"flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1; fi && export PATH=\"$PATH:$PWD/flutter/bin\" && cd flutter_app && flutter build web",
+  "buildCommand": "echo 'Using pre-built Flutter web files'",
   "outputDirectory": "flutter_app/build/web",
   "installCommand": "echo 'No install command needed'",
   "framework": null

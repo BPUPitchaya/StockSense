@@ -619,16 +619,17 @@ def get_budget_recommendations(authorization: str = Header(...)):
                 "message": "No Buy/Strong Buy stocks found. Check back later when market conditions improve."
             }
         
-        # Use percent change as score for allocation
-        total_score = sum(s.get('percent_change', 1) for s in top_picks) or 1
+        # Use absolute percent change as score so allocations always sum to 100%
+        scores = [max(abs(s.get('percent_change', 1)), 0.01) for s in top_picks]
+        total_score = sum(scores) or 1
         
         stock_recommendations = []
         total_allocated = 0.0
         
-        for signal in top_picks:
-            score = signal.get('percent_change', 1)
-            allocation_pct = score / total_score if total_score > 0 else 1 / len(top_picks)
-            amount = budget * allocation_pct * 0.8  # Use 80% of budget, keep 20% cash
+        for i, signal in enumerate(top_picks):
+            score = scores[i]
+            allocation_pct = score / total_score
+            amount = budget * allocation_pct
             
             current_price = signal.get('current_price', 0)
             shares = amount / current_price if current_price > 0 else 0
