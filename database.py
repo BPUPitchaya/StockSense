@@ -70,6 +70,14 @@ def init_db():
                 conn.commit()
             print("user_id column added to personal_watchlist")
         
+        # Add preferred_currency column to users if it doesn't exist
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'preferred_currency' not in columns:
+            with engine.connect() as conn:
+                conn.execute("ALTER TABLE users ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'")
+                conn.commit()
+            print("preferred_currency column added to users")
+        
         # Ensure default stocks are in personal watchlist
         session = SessionLocal()
         try:
