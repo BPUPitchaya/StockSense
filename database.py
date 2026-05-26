@@ -1,6 +1,6 @@
 import os
 from typing import List, Dict, Optional
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -58,7 +58,7 @@ def init_db():
         columns = [col['name'] for col in inspector.get_columns('portfolio')]
         if 'user_id' not in columns:
             with engine.connect() as conn:
-                conn.execute("ALTER TABLE portfolio ADD COLUMN user_id INTEGER")
+                conn.execute(text("ALTER TABLE portfolio ADD COLUMN user_id INTEGER"))
                 conn.commit()
             print("user_id column added to portfolio")
         
@@ -66,7 +66,7 @@ def init_db():
         columns = [col['name'] for col in inspector.get_columns('personal_watchlist')]
         if 'user_id' not in columns:
             with engine.connect() as conn:
-                conn.execute("ALTER TABLE personal_watchlist ADD COLUMN user_id INTEGER")
+                conn.execute(text("ALTER TABLE personal_watchlist ADD COLUMN user_id INTEGER"))
                 conn.commit()
             print("user_id column added to personal_watchlist")
         
@@ -74,7 +74,7 @@ def init_db():
         columns = [col['name'] for col in inspector.get_columns('users')]
         if 'preferred_currency' not in columns:
             with engine.connect() as conn:
-                conn.execute("ALTER TABLE users ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'")
+                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'"))
                 conn.commit()
             print("preferred_currency column added to users")
         
