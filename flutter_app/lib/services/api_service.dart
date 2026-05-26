@@ -304,4 +304,37 @@ class ApiService {
   static Future<List<String>> getPersonalWatchlist() async => getWatchlist();
   static Future<void> addToPersonalWatchlist(String ticker) async => addToWatchlist(ticker);
   static Future<void> removeFromPersonalWatchlist(String ticker) async => removeFromWatchlist(ticker);
+
+  // Currency methods
+  static Future<List<dynamic>> getCurrencies() async {
+    final response = await http.get(Uri.parse('$baseUrl/currencies'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['currencies'];
+    } else {
+      throw Exception('Failed to get currencies');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserCurrency() async {
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/user/currency'), headers: headers);
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get user currency');
+    }
+  }
+
+  static Future<void> setUserCurrency(String currency) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/user/currency'),
+      headers: headers,
+      body: json.encode({'currency': currency}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to set currency: ${response.body}');
+    }
+  }
 }
