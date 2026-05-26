@@ -362,53 +362,45 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         if not watchlist:
             watchlist = signals.WATCHLIST
         
-        # Use unified cache key with stale-while-revalidate
-        watchlist_key = ",".join(sorted(watchlist))
-        cache_key = get_cache_key("predictions_unified", category=category or "all", watchlist=watchlist_key[:50])
-        cached_data, is_fresh = get_from_cache(cache_key, allow_stale=True)
+        # Use SAME cache key as /signals for consistency
+        cache_key = get_cache_key("signals_5stocks", category=category or "all")
+        cached_signals, is_fresh = get_from_cache(cache_key, allow_stale=True)
         
-        if cached_data:
+        if cached_signals:
+            # Convert cached signals to predictions format
+            sorted_signals = sorted(cached_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+            all_predictions = convert_signals_to_predictions(sorted_signals)
+            predictions = {
+                'gainers': all_predictions[:3],
+                'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
+                'all_predictions': all_predictions,
+                'count': len(all_predictions)
+            }
+            
             if is_fresh:
-                return cached_data
+                print(f"Returning {len(all_predictions)} FRESH predictions from shared cache")
+                return predictions
             else:
-                # Stale - refresh in background
-                def refresh_predictions():
-                    try:
-                        all_signals = signals.get_all_signals()
-                        sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
-                        all_predictions = convert_signals_to_predictions(sorted_signals)
-                        predictions = {
-                            'gainers': all_predictions[:3],
-                            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
-                            'all_predictions': all_predictions,
-                            'count': len(all_predictions)
-                        }
-                        set_cache(cache_key, clean_for_json(predictions))
-                    except Exception as e:
-                        print(f"Background refresh predictions failed: {e}")
-                _refresh_executor.submit(refresh_predictions)
-                return cached_data
+                # Stale - refresh signals cache in background
+                print(f"Returning {len(all_predictions)} predictions from STALE shared cache (refreshing)")
+                refresh_cache_async(cache_key, signals.get_all_signals)
+                return predictions
         
-        # Cold start - fetch fresh
+        # Cold start - fetch fresh signals (this will also populate shared cache)
         all_signals = signals.get_all_signals()
         
-        # Sort by percent_change for gainers/losers
+        # Sort and convert to predictions format
         sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
-        
-        # Convert to prediction format Flutter expects
         all_predictions = convert_signals_to_predictions(sorted_signals)
         
-        # Format as predictions response
         predictions = {
-            'gainers': all_predictions[:3],  # Top 3
-            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,  # Bottom 3
+            'gainers': all_predictions[:3],
+            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
             'all_predictions': all_predictions,
             'count': len(all_predictions)
         }
         
-        clean_predictions = clean_for_json(predictions)
-        set_cache(cache_key, clean_predictions)
-        return clean_predictions
+        return predictions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
