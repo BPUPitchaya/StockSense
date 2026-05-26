@@ -139,10 +139,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       TextField(
                         controller: _budgetController,
                         keyboardType: TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Enter weekly budget amount',
-                          border: OutlineInputBorder(),
-                          prefixText: '${CurrencyService.symbol}',
+                          border: const OutlineInputBorder(),
+                          prefixText: CurrencyService.symbol,
                         ),
                       ),
                       const SizedBox(height: 16),
