@@ -30,6 +30,72 @@ def clean_for_json(data):
     """Strip numpy types by round-tripping through JSON"""
     return json.loads(json.dumps(data, cls=NumpySafeEncoder))
 
+def signal_to_prediction(signal_data):
+    """Convert signal data to prediction format Flutter expects"""
+    signal = signal_data.get('signal', 'HOLD')
+    percent_change = signal_data.get('percent_change', 0) or 0
+    
+    # Map signal to prediction text
+    prediction_map = {
+        'STRONG BUY': 'STRONG BUY',
+        'BUY': 'BUY',
+        'HOLD': 'HOLD',
+        'SELL': 'SELL',
+        'STRONG SELL': 'STRONG SELL'
+    }
+    prediction = prediction_map.get(signal, 'HOLD')
+    
+    # Calculate confidence based on percent change magnitude
+    abs_change = abs(percent_change)
+    if abs_change >= 3:
+        confidence = 85
+    elif abs_change >= 2:
+        confidence = 70
+    elif abs_change >= 1:
+        confidence = 55
+    else:
+        confidence = 50
+    
+    # Determine trend strength
+    if abs_change >= 2.5:
+        trend_strength = 'strong'
+    elif abs_change >= 1:
+        trend_strength = 'moderate'
+    else:
+        trend_strength = 'weak'
+    
+    # Build factors list
+    factors = []
+    if percent_change > 0:
+        factors.append(f'Up {percent_change:.1f}% today')
+        factors.append('Positive momentum')
+    elif percent_change < 0:
+        factors.append(f'Down {abs(percent_change):.1f}% today')
+        factors.append('Negative momentum')
+    else:
+        factors.append('Neutral price action')
+    
+    factors.append(f'Signal: {signal}')
+    
+    return {
+        'ticker': signal_data.get('ticker'),
+        'name': signal_data.get('name'),
+        'current_price': signal_data.get('current_price', 0),
+        'prediction': prediction,
+        'confidence': confidence,
+        'score': percent_change,  # Use percent_change as score
+        'potential_change': percent_change,
+        'trend_strength': trend_strength,
+        'factors': factors,
+        'signal': signal,
+        'percent_change': percent_change,
+        'date': signal_data.get('date', datetime.now().isoformat())
+    }
+
+def convert_signals_to_predictions(signals_list):
+    """Convert list of signals to predictions format"""
+    return [signal_to_prediction(s) for s in signals_list]
+
 app = FastAPI()
 
 # Configure CORS
@@ -310,11 +376,12 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
                     try:
                         all_signals = signals.get_all_signals()
                         sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+                        all_predictions = convert_signals_to_predictions(sorted_signals)
                         predictions = {
-                            'gainers': sorted_signals[:3],
-                            'losers': sorted_signals[-3:] if len(sorted_signals) >= 3 else sorted_signals,
-                            'all_signals': sorted_signals,
-                            'count': len(sorted_signals)
+                            'gainers': all_predictions[:3],
+                            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
+                            'all_predictions': all_predictions,
+                            'count': len(all_predictions)
                         }
                         set_cache(cache_key, clean_for_json(predictions))
                     except Exception as e:
@@ -328,12 +395,15 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         # Sort by percent_change for gainers/losers
         sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
         
+        # Convert to prediction format Flutter expects
+        all_predictions = convert_signals_to_predictions(sorted_signals)
+        
         # Format as predictions response
         predictions = {
-            'gainers': sorted_signals[:3],  # Top 3
-            'losers': sorted_signals[-3:] if len(sorted_signals) >= 3 else sorted_signals,  # Bottom 3
-            'all_signals': sorted_signals,
-            'count': len(sorted_signals)
+            'gainers': all_predictions[:3],  # Top 3
+            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,  # Bottom 3
+            'all_predictions': all_predictions,
+            'count': len(all_predictions)
         }
         
         clean_predictions = clean_for_json(predictions)
