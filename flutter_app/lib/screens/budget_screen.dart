@@ -31,9 +31,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     try {
       final budget = await ApiService.getBudget();
+      final localAmount = CurrencyService.convert(budget);
       setState(() {
         _currentBudget = budget;
-        _budgetController.text = budget.toString();
+        _budgetController.text = CurrencyService.currency == 'JPY' || CurrencyService.currency == 'KRW'
+            ? localAmount.toStringAsFixed(0)
+            : localAmount.toStringAsFixed(2);
         _isLoading = false;
       });
     } catch (e) {
