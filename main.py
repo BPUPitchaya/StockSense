@@ -207,22 +207,9 @@ def refresh_cache_async(key: str, refresh_func, *args, **kwargs):
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize database and warm up cache"""
+    """Initialize database only - cache warms on first request"""
     database.init_db()
-    
-    # Warm up cache on startup (background)
-    def warm_cache():
-        try:
-            print("Warming up signals cache...")
-            data = signals.get_all_signals()
-            if data:
-                cache_key = get_cache_key("signals_5stocks", category="all")
-                set_cache(cache_key, clean_for_json(data))
-                print(f"Cache warmed with {len(data)} signals")
-        except Exception as e:
-            print(f"Cache warm-up failed: {e}")
-    
-    threading.Thread(target=warm_cache, daemon=True).start()
+    print("Database initialized, ready for requests")
 
 @app.get("/")
 def read_root():
@@ -339,16 +326,24 @@ def get_signals(category: Optional[str] = None):
             refresh_cache_async(cache_key, signals.get_all_signals)
             return cached_data
     
-    # No cache - must fetch (this is the slow path on cold start)
-    try:
-        all_signals_data = signals.get_all_signals()
-        print(f"Generated {len(all_signals_data)} signals (cold start)")
-        clean_data = clean_for_json(all_signals_data)
-        set_cache(cache_key, clean_data)
-        return clean_data
-    except Exception as e:
-        print(f"Error in get_signals: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Cold start - fetch fresh with retry
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            all_signals_data = signals.get_all_signals()
+            if all_signals_data:
+                print(f"Generated {len(all_signals_data)} signals (cold start)")
+                clean_data = clean_for_json(all_signals_data)
+                set_cache(cache_key, clean_data)
+                return clean_data
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+    
+    # All retries failed
+    print(f"All retries failed for signals fetch")
+    raise HTTPException(status_code=503, detail="Stock data temporarily unavailable. Please try again.")
 
 @app.get("/predictions")
 def get_predictions(category: Optional[str] = None, authorization: str = Header(...)):
@@ -386,21 +381,30 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
                 refresh_cache_async(cache_key, signals.get_all_signals)
                 return predictions
         
-        # Cold start - fetch fresh signals (this will also populate shared cache)
-        all_signals = signals.get_all_signals()
+        # Cold start - fetch fresh signals with retry
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                all_signals = signals.get_all_signals()
+                if all_signals:
+                    # Sort and convert to predictions format
+                    sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
+                    all_predictions = convert_signals_to_predictions(sorted_signals)
+                    
+                    predictions = {
+                        'gainers': all_predictions[:3],
+                        'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
+                        'all_predictions': all_predictions,
+                        'count': len(all_predictions)
+                    }
+                    return predictions
+            except Exception as e:
+                print(f"Predictions attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
         
-        # Sort and convert to predictions format
-        sorted_signals = sorted(all_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
-        all_predictions = convert_signals_to_predictions(sorted_signals)
-        
-        predictions = {
-            'gainers': all_predictions[:3],
-            'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
-            'all_predictions': all_predictions,
-            'count': len(all_predictions)
-        }
-        
-        return predictions
+        # All retries failed
+        raise HTTPException(status_code=503, detail="Prediction service temporarily unavailable. Please try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
