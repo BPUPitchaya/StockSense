@@ -317,7 +317,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 Text('200-day MA: \$${signal.ma200!.toStringAsFixed(2)}'),
               if (signal.rsi != null)
                 Text('RSI: ${signal.rsi!.toStringAsFixed(2)}'),
-              Text('Date: ${signal.date}'),
+              if (signal.percentChange != null)
+                Text(
+                  "Today's Change: ${signal.percentChange! >= 0 ? '+' : ''}${signal.percentChange!.toStringAsFixed(2)}%",
+                  style: TextStyle(
+                    color: signal.percentChange! >= 0 ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
             ],
           ),
           trailing: Container(

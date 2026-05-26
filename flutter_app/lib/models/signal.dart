@@ -7,6 +7,7 @@ class Signal {
   final double? rsi;
   final String signal;
   final String date;
+  final double? percentChange;
 
   Signal({
     required this.ticker,
@@ -17,6 +18,7 @@ class Signal {
     this.rsi,
     required this.signal,
     required this.date,
+    this.percentChange,
   });
 
   factory Signal.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class Signal {
       rsi: json['rsi']?.toDouble(),
       signal: json['signal'] ?? 'HOLD',
       date: json['date'] ?? '',
+      percentChange: json['percent_change']?.toDouble(),
     );
   }
 }
