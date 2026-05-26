@@ -38,7 +38,10 @@ class CurrencyService {
 
   static String format(double usdPrice) {
     final converted = convert(usdPrice);
-    if (_currency == 'JPY' || _currency == 'KRW') {
+    if (_currency == 'KRW') {
+      return '${converted.toStringAsFixed(0)}$_symbol';
+    }
+    if (_currency == 'JPY') {
       return '$_symbol${converted.toStringAsFixed(0)}';
     }
     return '$_symbol${converted.toStringAsFixed(2)}';

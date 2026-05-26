@@ -34,7 +34,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       final localAmount = CurrencyService.convert(budget);
       setState(() {
         _currentBudget = budget;
-        _budgetController.text = CurrencyService.currency == 'JPY' || CurrencyService.currency == 'KRW'
+        _budgetController.text = (CurrencyService.currency == 'JPY' || CurrencyService.currency == 'KRW')
             ? localAmount.toStringAsFixed(0)
             : localAmount.toStringAsFixed(2);
         _isLoading = false;
