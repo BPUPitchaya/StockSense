@@ -940,36 +940,6 @@ def predict_stock(ticker: str) -> Optional[Dict]:
         return None
 
 
-def get_all_signals(category: Optional[str] = None) -> List[Dict]:
-    """Get trading signals for watchlist stocks using parallel processing"""
-    # Use category-specific watchlist if provided
-    target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
-    
-    signals_data = []
-    
-    print(f"Fetching signals for {len(target_watchlist)} stocks in {category or 'all'} category...")
-    
-    # Use ThreadPoolExecutor for parallel processing
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_ticker = {
-            executor.submit(analyze_stock, ticker): ticker 
-            for ticker in target_watchlist
-        }
-        
-        for future in future_to_ticker:
-            ticker = future_to_ticker[future]
-            try:
-                result = future.result()
-                if result:
-                    signals_data.append(result)
-                    print(f"✓ {ticker}")
-            except Exception as e:
-                print(f"✗ {ticker} failed: {e}")
-    
-    print(f"Completed {len(signals_data)} signals")
-    return signals_data
-
-
 def get_all_predictions(category: Optional[str] = None, limit: int = 5, watchlist: Optional[List[str]] = None) -> List[Dict]:
     """Get predictions for watchlist stocks using parallel processing"""
     # Use provided watchlist or combine personal with default
@@ -1032,12 +1002,11 @@ def get_all_predictions(category: Optional[str] = None, limit: int = 5, watchlis
 
 
 if __name__ == "__main__":
-    signals = get_all_signals()
+    signals_list = get_all_signals()
     print("\n=== Trading Signals ===")
-    for signal in signals:
+    for signal in signals_list:
         print(f"\nTicker: {signal['ticker']}")
+        print(f"Name: {signal.get('name', 'N/A')}")
         print(f"Current Price: ${signal['current_price']:.2f}")
-        print(f"50-day MA: ${signal['ma50']:.2f}")
-        print(f"200-day MA: ${signal['ma200']:.2f}")
-        print(f"RSI: {signal['rsi']:.2f}")
+        print(f"Change: {signal['percent_change']:.2f}%")
         print(f"Signal: {signal['signal']}")
