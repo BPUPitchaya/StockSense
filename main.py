@@ -735,6 +735,12 @@ def convert_price(price_usd: float, target_currency: str) -> tuple:
 class CurrencyRequest(BaseModel):
     currency: str
 
+@app.get("/exchange-rates")
+def get_exchange_rates_endpoint():
+    """Get current exchange rates from USD"""
+    rates = get_exchange_rates('USD')
+    return {"base": "USD", "rates": rates, "symbols": CURRENCY_SYMBOLS}
+
 @app.get("/currencies")
 def get_supported_currencies():
     """Get list of supported currencies"""

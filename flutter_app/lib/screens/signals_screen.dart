@@ -19,38 +19,68 @@ class _SignalsScreenState extends State<SignalsScreen> {
   bool isSearching = false;
   List<String> personalWatchlist = [];
   Map<String, bool> inWatchlist = {};
+  String _currency = 'USD';
+  String _currencySymbol = '\$';
+  Map<String, dynamic> _exchangeRates = {};
 
   @override
   void initState() {
     super.initState();
-    _loadSignals();
+    _loadAll();
     _loadPersonalWatchlist();
   }
 
-  Future<void> _loadSignals() async {
-    setState(() {
-      isLoading = true;
-      error = null;
-      searchedSignal = null;
-    });
-
+  Future<void> _loadAll() async {
+    setState(() { isLoading = true; error = null; searchedSignal = null; });
     try {
       final loadedSignals = await ApiService.getSignals();
+      // Load currency info in parallel, but don't fail if it errors
+      String currency = 'USD';
+      String symbol = '\$';
+      Map<String, dynamic> rates = {};
+      try {
+        final currencyResults = await Future.wait([
+          ApiService.getUserCurrency(),
+          ApiService.getExchangeRates(),
+        ]);
+        final userCurrency = currencyResults[0] as Map<String, dynamic>;
+        final ratesData = currencyResults[1] as Map<String, dynamic>;
+        currency = userCurrency['currency'] ?? 'USD';
+        symbol = userCurrency['symbol'] ?? '\$';
+        rates = (ratesData['rates'] as Map<String, dynamic>?) ?? {};
+      } catch (_) {
+        // Fall back to USD if currency fetch fails
+      }
       if (mounted) {
         setState(() {
           signals = loadedSignals;
+          _currency = currency;
+          _currencySymbol = symbol;
+          _exchangeRates = rates;
           isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          error = e.toString();
-          isLoading = false;
-        });
+        setState(() { error = e.toString(); isLoading = false; });
       }
     }
   }
+
+  double _convertPrice(double usdPrice) {
+    if (_currency == 'USD' || !_exchangeRates.containsKey(_currency)) return usdPrice;
+    return usdPrice * (_exchangeRates[_currency] as num).toDouble();
+  }
+
+  String _formatPrice(double usdPrice) {
+    final converted = _convertPrice(usdPrice);
+    if (_currency == 'JPY' || _currency == 'KRW') {
+      return '$_currencySymbol${converted.toStringAsFixed(0)}';
+    }
+    return '$_currencySymbol${converted.toStringAsFixed(2)}';
+  }
+
+  Future<void> _loadSignals() => _loadAll();
 
   Future<void> _searchStock() async {
     final ticker = _searchController.text.trim().toUpperCase();
@@ -310,11 +340,11 @@ class _SignalsScreenState extends State<SignalsScreen> {
                   ),
                 ),
               const SizedBox(height: 8),
-              Text('Current Price: \$${signal.currentPrice.toStringAsFixed(2)}'),
+              Text('Current Price: ${_formatPrice(signal.currentPrice)}'),
               if (signal.ma50 != null)
-                Text('50-day MA: \$${signal.ma50!.toStringAsFixed(2)}'),
+                Text('50-day MA: ${_formatPrice(signal.ma50!)}'),
               if (signal.ma200 != null)
-                Text('200-day MA: \$${signal.ma200!.toStringAsFixed(2)}'),
+                Text('200-day MA: ${_formatPrice(signal.ma200!)}'),
               if (signal.rsi != null)
                 Text('RSI: ${signal.rsi!.toStringAsFixed(2)}'),
               if (signal.percentChange != null)

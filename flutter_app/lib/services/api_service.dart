@@ -337,4 +337,13 @@ class ApiService {
       throw Exception('Failed to set currency: ${response.body}');
     }
   }
+
+  static Future<Map<String, dynamic>> getExchangeRates() async {
+    final response = await http.get(Uri.parse('$baseUrl/exchange-rates'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get exchange rates');
+    }
+  }
 }
