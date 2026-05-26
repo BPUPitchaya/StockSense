@@ -301,6 +301,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (signal.name != null)
+                Text(
+                  signal.name!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
+                ),
               const SizedBox(height: 8),
               Text('Current Price: \$${signal.currentPrice.toStringAsFixed(2)}'),
               if (signal.ma50 != null)
