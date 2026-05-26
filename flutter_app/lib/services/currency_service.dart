@@ -26,6 +26,11 @@ class CurrencyService {
 
   static Future<void> reload() => load();
 
+  static double toUsd(double localAmount) {
+    if (_currency == 'USD' || !_rates.containsKey(_currency)) return localAmount;
+    return localAmount / (_rates[_currency] as num).toDouble();
+  }
+
   static double convert(double usdPrice) {
     if (_currency == 'USD' || !_rates.containsKey(_currency)) return usdPrice;
     return usdPrice * (_rates[_currency] as num).toDouble();

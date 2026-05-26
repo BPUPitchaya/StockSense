@@ -59,7 +59,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
 
     try {
-      await ApiService.setBudget(amount);
+      final amountUsd = CurrencyService.toUsd(amount);
+      await ApiService.setBudget(amountUsd);
       await _loadBudget();
       await _getRecommendations();
       setState(() {
