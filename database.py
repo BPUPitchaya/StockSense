@@ -20,6 +20,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    preferred_currency = Column(String, default='USD')  # User's preferred currency
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class PortfolioPosition(Base):
@@ -399,5 +400,34 @@ def get_budget(user_id: int = None) -> float:
     except Exception as e:
         print(f"Error getting budget: {e}")
         return 0.0
+    finally:
+        session.close()
+
+def get_user_currency(user_id: int) -> str:
+    """Get user's preferred currency"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        return user.preferred_currency if user else 'USD'
+    except Exception as e:
+        print(f"Error getting user currency: {e}")
+        return 'USD'
+    finally:
+        session.close()
+
+def set_user_currency(user_id: int, currency: str) -> bool:
+    """Set user's preferred currency"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user:
+            user.preferred_currency = currency
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error setting user currency: {e}")
+        session.rollback()
+        return False
     finally:
         session.close()

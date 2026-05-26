@@ -680,6 +680,128 @@ def set_budget(budget: BudgetRequest, authorization: str = Header(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Currency conversion with caching
+import requests
+
+CURRENCY_SYMBOLS = {
+    'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CNY': '¥',
+    'THB': '฿', 'KRW': '₩', 'INR': '₹', 'AUD': 'A$', 'CAD': 'C$',
+    'CHF': 'Fr', 'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr', 'NZD': 'NZ$',
+    'SGD': 'S$', 'HKD': 'HK$', 'MXN': '$', 'BRL': 'R$', 'ZAR': 'R'
+}
+
+def get_exchange_rates(base: str = 'USD') -> Dict[str, float]:
+    """Get exchange rates with Redis caching (24h TTL)"""
+    cache_key = f"exchange_rates:{base}"
+    
+    # Try Redis cache first
+    if signals.redis_client:
+        try:
+            cached = signals.redis_client.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception as e:
+            print(f"Redis cache read failed: {e}")
+    
+    # Fetch from API
+    try:
+        response = requests.get(f"https://api.exchangerate-api.com/v4/latest/{base}", timeout=5)
+        rates = response.json()['rates']
+        
+        # Cache in Redis (24 hours = 86400 seconds)
+        if signals.redis_client:
+            try:
+                signals.redis_client.setex(cache_key, 86400, json.dumps(rates))
+            except Exception as e:
+                print(f"Redis cache write failed: {e}")
+        
+        return rates
+    except Exception as e:
+        print(f"Failed to fetch exchange rates: {e}")
+        return {}
+
+def convert_price(price_usd: float, target_currency: str) -> tuple:
+    """Convert USD price to target currency, returns (converted_price, symbol)"""
+    if target_currency == 'USD' or not target_currency:
+        return price_usd, CURRENCY_SYMBOLS.get('USD', '$')
+    
+    rates = get_exchange_rates('USD')
+    if target_currency in rates:
+        converted = price_usd * rates[target_currency]
+        symbol = CURRENCY_SYMBOLS.get(target_currency, target_currency)
+        return converted, symbol
+    return price_usd, CURRENCY_SYMBOLS.get('USD', '$')
+
+class CurrencyRequest(BaseModel):
+    currency: str
+
+@app.get("/currencies")
+def get_supported_currencies():
+    """Get list of supported currencies"""
+    return {
+        "currencies": [
+            {"code": "USD", "name": "US Dollar", "symbol": "$"},
+            {"code": "EUR", "name": "Euro", "symbol": "€"},
+            {"code": "GBP", "name": "British Pound", "symbol": "£"},
+            {"code": "JPY", "name": "Japanese Yen", "symbol": "¥"},
+            {"code": "CNY", "name": "Chinese Yuan", "symbol": "¥"},
+            {"code": "THB", "name": "Thai Baht", "symbol": "฿"},
+            {"code": "KRW", "name": "Korean Won", "symbol": "₩"},
+            {"code": "INR", "name": "Indian Rupee", "symbol": "₹"},
+            {"code": "AUD", "name": "Australian Dollar", "symbol": "A$"},
+            {"code": "CAD", "name": "Canadian Dollar", "symbol": "C$"},
+        ]
+    }
+
+@app.get("/user/currency")
+def get_user_currency(authorization: str = Header(...)):
+    """Get user's preferred currency"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        currency = database.get_user_currency(user_id)
+        return {"currency": currency, "symbol": CURRENCY_SYMBOLS.get(currency, '$')}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/user/currency")
+def set_user_currency(request: CurrencyRequest, authorization: str = Header(...)):
+    """Set user's preferred currency"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.set_user_currency(user_id, request.currency.upper())
+        if success:
+            return {"message": "Currency updated", "currency": request.currency.upper()}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to update currency")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/convert-price")
+def convert_price_endpoint(price: float, from_currency: str = 'USD', to_currency: str = 'USD'):
+    """Convert price between currencies"""
+    try:
+        rates = get_exchange_rates(from_currency)
+        if to_currency in rates:
+            converted = price * rates[to_currency]
+            return {
+                "original_price": price,
+                "original_currency": from_currency,
+                "converted_price": converted,
+                "target_currency": to_currency,
+                "symbol": CURRENCY_SYMBOLS.get(to_currency, to_currency)
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"Currency {to_currency} not supported")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
