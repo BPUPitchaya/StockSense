@@ -19,6 +19,38 @@ CATEGORIES = {
 
 WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "TSLA"]
 
+# ETF name mappings (Finnhub doesn't return names for ETFs)
+ETF_NAMES = {
+    'VOO': 'Vanguard S&P 500 ETF',
+    'SPY': 'SPDR S&P 500 ETF Trust',
+    'QQQ': 'Invesco QQQ Trust (Nasdaq-100)',
+    'GLD': 'SPDR Gold Shares',
+    'SLV': 'iShares Silver Trust',
+    'VTI': 'Vanguard Total Stock Market ETF',
+    'BND': 'Vanguard Total Bond Market ETF',
+    'VEA': 'Vanguard FTSE Developed Markets ETF',
+    'VWO': 'Vanguard FTSE Emerging Markets ETF',
+    'IJH': 'iShares Core S&P Mid-Cap ETF',
+    'IJR': 'iShares Core S&P Small-Cap ETF',
+    'VUG': 'Vanguard Growth ETF',
+    'VTV': 'Vanguard Value ETF',
+    'VXUS': 'Vanguard Total International Stock ETF',
+    'SCHD': 'Schwab US Dividend Equity ETF',
+    'ARKK': 'ARK Innovation ETF',
+    'XLF': 'Financial Select Sector SPDR Fund',
+    'XLK': 'Technology Select Sector SPDR Fund',
+    'XLE': 'Energy Select Sector SPDR Fund',
+    'XLI': 'Industrial Select Sector SPDR Fund',
+    'XLP': 'Consumer Staples Select Sector SPDR Fund',
+    'XLU': 'Utilities Select Sector SPDR Fund',
+    'XLV': 'Health Care Select Sector SPDR Fund',
+    'XLY': 'Consumer Discretionary Select Sector SPDR Fund',
+    'XLB': 'Materials Select Sector SPDR Fund',
+    'XRT': 'SPDR S&P Retail ETF',
+    'KRE': 'SPDR S&P Regional Banking ETF',
+    'IBIT': 'iShares Bitcoin Trust ETF',
+}
+
 # Initialize Finnhub client
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
@@ -592,7 +624,7 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         # Add profile data if available
         if profile:
             result.update({
-                'name': profile.get('name'),  # Company full name
+                'name': profile.get('name') or ETF_NAMES.get(ticker),  # Company full name or ETF mapping
                 'market_cap': profile.get('marketCapitalization'),
                 'pe_ratio': profile.get('pe'),
                 'dividend_yield': profile.get('dividendYield'),
@@ -607,6 +639,11 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
                 'exchange': profile.get('exchange'),
                 'currency': profile.get('currency'),
             })
+        else:
+            # No profile data - check if it's an ETF
+            if ticker in ETF_NAMES:
+                result['name'] = ETF_NAMES[ticker]
+        
         # Cache result in Redis (15 min TTL)
         if redis_client:
             try:
