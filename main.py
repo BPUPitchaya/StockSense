@@ -677,8 +677,8 @@ def get_budget_recommendations(authorization: str = Header(...)):
                 'confidence': min(abs(signal.get('percent_change', 0)) * 10 + 50, 95),  # Higher confidence for bigger moves
                 'score': score,
                 'potential_change': signal.get('percent_change', 0),
-                'factors': [f"Daily momentum: {signal.get('percent_change', 0):.2f}%", 
-                           f"Price: ${current_price:.2f}"]
+                'factors': [f"Daily momentum: {signal.get('percent_change', 0):.2f}%",
+                           f"Price: {current_price:.2f} USD"]
             })
             total_allocated += amount
         
@@ -687,7 +687,7 @@ def get_budget_recommendations(authorization: str = Header(...)):
             "total_allocated": total_allocated,
             "remaining_budget": budget - total_allocated,
             "recommendations": stock_recommendations,
-            "message": f"Based on your ${budget:.2f} budget, here are {len(stock_recommendations)} top momentum picks"
+            "message": f"Here are {len(stock_recommendations)} top momentum picks for your budget"
         }
     except HTTPException:
         raise
