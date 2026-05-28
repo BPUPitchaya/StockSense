@@ -145,15 +145,15 @@ ThemeData buildAppTheme() {
 }
 
 class DarkColors {
-  static const bg = Color(0xFF0F172A);
-  static const surface = Color(0xFF1E293B);
-  static const border = Color(0xFF334155);
-  static const text = Color(0xFFF1F5F9);
-  static const textMuted = Color(0xFF94A3B8);
-  static const textFaint = Color(0xFF475569);
+  static const bg = Color(0xFF0A0A0A);       // near-black background
+  static const surface = Color(0xFF1A1A1A);  // dark grey cards
+  static const border = Color(0xFF2E2E2E);   // subtle border
+  static const text = Color(0xFFFFFFFF);     // pure white text
+  static const textMuted = Color(0xFFB0B0B0); // light grey secondary text
+  static const textFaint = Color(0xFF666666); // faint hints/placeholders
   static const up = Color(0xFF22C55E);
   static const down = Color(0xFFEF4444);
-  static const accent = Color(0xFF38BDF8);
+  static const accent = Color(0xFF60A5FA);   // soft blue accent
 }
 
 ThemeData buildDarkTheme() {
@@ -291,20 +291,21 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: AppColors.textFaint),
+            Icon(icon, size: 48, color: cs.onSurface.withOpacity(0.35)),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.text,
+                color: cs.onSurface,
               ),
             ),
             if (subtitle != null) ...[
@@ -312,7 +313,7 @@ class EmptyState extends StatelessWidget {
               Text(
                 subtitle!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 13),
               ),
             ],
             if (action != null) ...[
