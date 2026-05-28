@@ -20,8 +20,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBudget();
-    CurrencyService.load().then((_) { if (mounted) setState(() {}); });
+    CurrencyService.load().then((_) {
+      if (mounted) {
+        setState(() {});
+        _loadBudget();
+      }
+    });
   }
 
   Future<void> _loadBudget() async {
@@ -63,6 +67,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
 
     try {
+      // Ensure rates are fresh before converting
+      await CurrencyService.load();
       final amountUsd = CurrencyService.toUsd(amount);
       await ApiService.setBudget(amountUsd);
       await _loadBudget();
@@ -145,9 +151,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         controller: _budgetController,
                         keyboardType: TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
-                          labelText: 'Enter weekly budget amount',
+                          labelText: 'Enter weekly budget (${CurrencyService.currency})',
                           border: const OutlineInputBorder(),
-                          prefixText: CurrencyService.symbol,
+                          prefixText: '${CurrencyService.symbol} ',
+                          suffixText: CurrencyService.currency,
+                          hintText: 'e.g. 100',
                         ),
                       ),
                       const SizedBox(height: 16),
