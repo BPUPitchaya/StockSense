@@ -43,11 +43,13 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     if (nativeCurrency != null && nativeCurrency != 'USD') {
       final sym = _currencySymbols[nativeCurrency] ?? nativeCurrency;
       if (nativeCurrency == 'JPY' || nativeCurrency == 'KRW') {
-        return '$sym${price.toStringAsFixed(0)}';
+        return '$sym${price.toStringAsFixed(0)} $nativeCurrency';
       }
-      return '$sym${price.toStringAsFixed(2)}';
+      return '$sym${price.toStringAsFixed(2)} $nativeCurrency';
     }
-    return CurrencyService.format(price);
+    // US stock — append user's currency code
+    final code = CurrencyService.currency;
+    return '${CurrencyService.format(price)} $code';
   }
 
   @override
