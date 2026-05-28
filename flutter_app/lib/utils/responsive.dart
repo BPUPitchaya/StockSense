@@ -6,7 +6,7 @@ class ResponsiveBody extends StatelessWidget {
   final Widget child;
   final double maxWidth;
 
-  const ResponsiveBody({super.key, required this.child, this.maxWidth = 700});
+  const ResponsiveBody({super.key, required this.child, this.maxWidth = 1100});
 
   @override
   Widget build(BuildContext context) {

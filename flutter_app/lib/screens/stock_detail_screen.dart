@@ -45,7 +45,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
 
     try {
       final results = await Future.wait([
-        ApiService.getStockHistory(widget.signal.ticker, '3mo'),
+        ApiService.getStockHistory(widget.signal.ticker, '1y'),
         ApiService.getStockInfo(widget.signal.ticker),
       ]);
       
@@ -478,9 +478,25 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     // Show ~5 date labels across the bottom
     final xInterval = (historicalData.length / 5).ceilToDouble();
 
-    // MA lines (in USD from Signal object)
-    final ma50Val = widget.signal.ma50;
-    final ma200Val = widget.signal.ma200;
+    // Compute rolling MAs from actual historical closes
+    List<FlSpot> rollingMA(int period) {
+      if (historicalData.length < period) return [];
+      final spots = <FlSpot>[];
+      double windowSum = historicalData
+          .sublist(0, period)
+          .fold(0.0, (s, d) => s + d.close);
+      spots.add(FlSpot((period - 1).toDouble(), windowSum / period));
+      for (int i = period; i < historicalData.length; i++) {
+        windowSum += historicalData[i].close - historicalData[i - period].close;
+        spots.add(FlSpot(i.toDouble(), windowSum / period));
+      }
+      return spots;
+    }
+
+    final ma50Spots = rollingMA(50);
+    final ma200Spots = rollingMA(200);
+    final hasMA50 = ma50Spots.isNotEmpty;
+    final hasMA200 = ma200Spots.isNotEmpty;
 
     final List<LineChartBarData> lines = [
       LineChartBarData(
@@ -495,19 +511,19 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           color: Colors.blue.withOpacity(0.08),
         ),
       ),
-      if (ma50Val != null && ma50Val >= minY && ma50Val <= maxY)
+      if (hasMA50)
         LineChartBarData(
-          spots: [FlSpot(0, ma50Val), FlSpot((historicalData.length - 1).toDouble(), ma50Val)],
-          isCurved: false,
+          spots: ma50Spots,
+          isCurved: true,
           color: Colors.orange,
           barWidth: 1.5,
           dotData: FlDotData(show: false),
           dashArray: [6, 4],
         ),
-      if (ma200Val != null && ma200Val >= minY && ma200Val <= maxY)
+      if (hasMA200)
         LineChartBarData(
-          spots: [FlSpot(0, ma200Val), FlSpot((historicalData.length - 1).toDouble(), ma200Val)],
-          isCurved: false,
+          spots: ma200Spots,
+          isCurved: true,
           color: Colors.red,
           barWidth: 1.5,
           dotData: FlDotData(show: false),
@@ -524,20 +540,20 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             Padding(
               padding: const EdgeInsets.only(left: 8),
               child: const Text(
-                'Price Chart (3 Months)',
+                'Price Chart (1 Year)',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             // Legend
-            if (ma50Val != null || ma200Val != null)
+            if (hasMA50 || hasMA200)
               Padding(
                 padding: const EdgeInsets.only(left: 8, top: 8),
                 child: Wrap(
                   spacing: 16,
                   children: [
                     _buildLegendItem(Colors.blue, 'Price'),
-                    if (ma50Val != null) _buildLegendItem(Colors.orange, 'MA50'),
-                    if (ma200Val != null) _buildLegendItem(Colors.red, 'MA200'),
+                    if (hasMA50) _buildLegendItem(Colors.orange, 'MA50'),
+                    if (hasMA200) _buildLegendItem(Colors.red, 'MA200'),
                   ],
                 ),
               ),
