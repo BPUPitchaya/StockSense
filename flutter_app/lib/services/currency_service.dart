@@ -39,11 +39,11 @@ class CurrencyService {
   static String format(double usdPrice) {
     final converted = convert(usdPrice);
     if (_currency == 'KRW') {
-      return '${converted.toStringAsFixed(0)}$_symbol';
+      return '${converted.toStringAsFixed(0)}$_symbol $_currency';
     }
     if (_currency == 'JPY') {
-      return '$_symbol${converted.toStringAsFixed(0)}';
+      return '$_symbol${converted.toStringAsFixed(0)} $_currency';
     }
-    return '$_symbol${converted.toStringAsFixed(2)}';
+    return '$_symbol${converted.toStringAsFixed(2)} $_currency';
   }
 }

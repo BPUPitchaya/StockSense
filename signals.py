@@ -11,6 +11,7 @@ import json
 from io import StringIO
 import finnhub
 import redis
+import requests
 
 # Core 5 stocks for fast loading
 CATEGORIES = {
@@ -82,6 +83,17 @@ def _yfinance_delay():
         print(f"Rate limiting: sleeping {sleep_time:.1f}s before yfinance request")
         time.sleep(sleep_time)
     _last_yfinance_request = time.time()
+
+
+# Shared session with browser-like headers to avoid Yahoo Finance rate limiting on cloud IPs
+_yf_session = requests.Session()
+_yf_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+})
 
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -260,7 +272,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
     for attempt in range(max_retries):
         try:
             _yfinance_delay()  # Enforce rate limiting
-            stock = yf.Ticker(ticker)
+            stock = yf.Ticker(ticker, session=_yf_session)
             df = stock.history(period=period)
             if df.empty:
                 return None
@@ -775,7 +787,7 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
     for attempt in range(max_retries):
         try:
             _yfinance_delay()  # Enforce global rate limiting
-            stock = yf.Ticker(ticker)
+            stock = yf.Ticker(ticker, session=_yf_session)
             info = stock.info
             
             if not info:
