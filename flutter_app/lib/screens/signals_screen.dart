@@ -287,7 +287,10 @@ class _SignalsScreenState extends State<SignalsScreen> {
     final isInWatchlist = inWatchlist[signal.ticker] ?? false;
     final pc = signal.percentChange;
     final isUp = (pc ?? 0) >= 0;
-    final changeColor = isUp ? AppColors.up : AppColors.down;
+    const upColor = Color(0xFF16A34A);
+    const downColor = Color(0xFFDC2626);
+    final changeColor = isUp ? upColor : downColor;
+    final cs = Theme.of(context).colorScheme;
 
     return Card(
       child: InkWell(
@@ -311,10 +314,10 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 children: [
                   Text(
                     signal.ticker,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.text,
+                      color: cs.onSurface,
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -339,7 +342,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                       child: Icon(
                         isInWatchlist ? Icons.star : Icons.star_border,
                         size: 20,
-                        color: isInWatchlist ? AppColors.text : AppColors.textFaint,
+                        color: isInWatchlist ? cs.onSurface : cs.onSurface.withOpacity(0.35),
                       ),
                     ),
                   ),
@@ -351,7 +354,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                   signal.name!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6)),
                 ),
               ],
               const SizedBox(height: 12),
@@ -361,11 +364,11 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 children: [
                   Text(
                     _formatPrice(signal.currentPrice),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.text,
-                      fontFeatures: [FontFeature.tabularFigures()],
+                      color: cs.onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -418,15 +421,16 @@ class _SignalsScreenState extends State<SignalsScreen> {
   }
 
   Widget _miniStat(String label, String value) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: AppColors.textFaint,
+              color: cs.onSurface.withOpacity(0.4),
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
             ),
@@ -434,11 +438,11 @@ class _SignalsScreenState extends State<SignalsScreen> {
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.text,
+              color: cs.onSurface,
               fontWeight: FontWeight.w600,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
