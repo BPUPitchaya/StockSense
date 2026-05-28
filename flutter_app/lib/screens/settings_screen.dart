@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../config.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
 import '../utils/responsive.dart';
@@ -14,7 +13,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _apiUrlController = TextEditingController();
   List<dynamic> currencies = [];
   String? selectedCurrency;
   String? currentSymbol;
@@ -23,7 +21,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _apiUrlController.text = Config.apiBaseUrl;
     _loadCurrenciesAndUserCurrency();
   }
 
@@ -79,21 +76,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
   
-  @override
-  void dispose() {
-    _apiUrlController.dispose();
-    super.dispose();
-  }
-
-  void _saveSettings() {
-    setState(() {
-      Config.setApiUrl(_apiUrlController.text);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Settings saved')),
-    );
-  }
-
   Future<void> _logout() async {
     await ApiService.logout();
     Navigator.pushReplacementNamed(context, '/login');
@@ -111,46 +93,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            const Text(
-              'API Configuration',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Backend API URL',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _apiUrlController,
-              decoration: const InputDecoration(
-                hintText: 'http://localhost:8000',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'For laptop: http://localhost:8000',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const Text(
-              'For phone: http://YOUR_LAPTOP_IP:8000',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveSettings,
-                child: const Text('Save Settings'),
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Divider(),
-            const SizedBox(height: 16),
             const Text(
               'Currency Settings',
               style: TextStyle(

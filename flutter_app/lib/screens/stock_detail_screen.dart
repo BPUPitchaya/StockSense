@@ -5,6 +5,7 @@ import '../models/historical_data.dart';
 import '../models/position.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../services/gemini_service.dart';
 import '../utils/responsive.dart';
 
 class StockDetailScreen extends StatefulWidget {
@@ -26,6 +27,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _buyPriceController = TextEditingController();
   final TextEditingController _totalAmountController = TextEditingController();
+  String? _aiAnalysis;
+  bool _isLoadingAi = false;
   DateTime? _buyDate;
   bool _useTotalAmount = false;
 
@@ -401,6 +404,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildSignalCard(),
+                      const SizedBox(height: 16),
+                      _buildAiAnalysisSection(),
                       const SizedBox(height: 24),
                       _buildPriceChart(),
                       const SizedBox(height: 24),
@@ -813,6 +818,118 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     if (numValue < 1e9) return '\$${(numValue / 1e6).toStringAsFixed(2)}M';
     if (numValue < 1e12) return '\$${(numValue / 1e9).toStringAsFixed(2)}B';
     return '\$${(numValue / 1e12).toStringAsFixed(2)}T';
+  }
+
+  String _cleanMarkdown(String text) {
+    return text
+        .replaceAll(RegExp(r'#{1,3}\s*'), '')
+        .replaceAll('**', '')
+        .trim();
+  }
+
+  Future<void> _generateAiAnalysis() async {
+    setState(() => _isLoadingAi = true);
+    try {
+      final metrics = <String, dynamic>{
+        'current_price': widget.signal.currentPrice,
+        'signal': widget.signal.signal,
+        'rsi': widget.signal.rsi,
+        'ma50': widget.signal.ma50,
+        'ma200': widget.signal.ma200,
+        'industry': stockInfo?['industry'],
+        'market_cap': stockInfo?['market_cap'],
+      };
+      final result = await GeminiService.getStockEvaluation(widget.signal.ticker, metrics);
+      if (mounted) setState(() => _aiAnalysis = result);
+    } catch (e) {
+      if (mounted) setState(() => _aiAnalysis = 'Error: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoadingAi = false);
+    }
+  }
+
+  Widget _buildAiAnalysisSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = theme.colorScheme.onSurface;
+    final secondaryTextColor = theme.colorScheme.onSurface.withOpacity(0.6);
+    
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            isDark ? Colors.deepPurple.withOpacity(0.15) : Colors.deepPurple.withOpacity(0.06),
+            isDark ? Colors.blue.withOpacity(0.15) : Colors.blue.withOpacity(0.06),
+          ],
+        ),
+        border: Border.all(color: Colors.deepPurple.withOpacity(isDark ? 0.3 : 0.15)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'AI Analysis',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: textColor),
+                ),
+                const Spacer(),
+                if (_aiAnalysis != null && !_isLoadingAi)
+                  IconButton(
+                    onPressed: _generateAiAnalysis,
+                    icon: Icon(Icons.refresh, size: 18, color: textColor.withOpacity(0.7)),
+                    tooltip: 'Regenerate',
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_aiAnalysis == null && !_isLoadingAi) ...[
+              Text(
+                'Get a quick AI-powered breakdown of strengths, risks, and outlook for this stock.',
+                style: TextStyle(fontSize: 13, color: secondaryTextColor, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _generateAiAnalysis,
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text('Generate AI Insights'),
+                ),
+              ),
+            ] else if (_isLoadingAi)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Analyzing...', style: TextStyle(fontSize: 13, color: secondaryTextColor)),
+                  ],
+                ),
+              )
+            else
+              SelectableText(
+                _cleanMarkdown(_aiAnalysis!),
+                style: TextStyle(fontSize: 13.5, height: 1.55, color: textColor.withOpacity(0.9)),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Color _getSignalColor(String signal) {
