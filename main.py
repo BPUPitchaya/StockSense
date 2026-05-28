@@ -428,17 +428,30 @@ def get_stock_info_endpoint(ticker: str):
 @app.get("/search/{ticker}")
 def search_stock(ticker: str):
     """Search/validate a stock ticker"""
-    # For futures tickers (ending in =F), use yfinance directly
-    if ticker.endswith('=F'):
+    # Route non-US tickers (NZ, AU, futures) through yfinance
+    is_regional = ticker.endswith('=F') or ticker.endswith('.NZ') or ticker.endswith('.AX')
+    if is_regional:
         try:
             stock_info = signals.get_stock_info(ticker)
             if stock_info:
+                # Attach technicals
+                technicals = signals.get_technical_indicators(ticker)
+                stock_info['ma50'] = technicals.get('ma50')
+                stock_info['ma200'] = technicals.get('ma200')
+                stock_info['volume_ratio'] = technicals.get('volume_ratio')
+                # Label the market
+                if ticker.endswith('.NZ'):
+                    stock_info.setdefault('description', 'NZX Listed')
+                    stock_info['market'] = 'NZX'
+                elif ticker.endswith('.AX'):
+                    stock_info.setdefault('description', 'ASX Listed')
+                    stock_info['market'] = 'ASX'
                 return stock_info
         except Exception as e:
             print(f"yfinance failed for {ticker}: {e}")
-        raise HTTPException(status_code=404, detail="Commodity not found")
+        raise HTTPException(status_code=404, detail="Ticker not found")
     
-    # For regular stocks, use Finnhub
+    # For US stocks, use Finnhub
     try:
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
@@ -448,7 +461,7 @@ def search_stock(ticker: str):
             stock_info['volume_ratio'] = technicals.get('volume_ratio')
             return stock_info
         else:
-            raise HTTPException(status_code=404, detail="Stock not found or not supported (US market only)")
+            raise HTTPException(status_code=404, detail="Stock not found. For NZ stocks use ticker.NZ (e.g. AIR.NZ), for AU use ticker.AX (e.g. CBA.AX)")
     except HTTPException:
         raise
     except Exception as e:
@@ -458,9 +471,15 @@ def search_stock(ticker: str):
 def validate_stock(ticker: str):
     """Validate a stock ticker"""
     try:
+        # NZ / AU / futures go through yfinance
+        if ticker.endswith('=F') or ticker.endswith('.NZ') or ticker.endswith('.AX'):
+            stock_info = signals.get_stock_info(ticker)
+            if stock_info and stock_info.get('current_price'):
+                return {"valid": True, "ticker": ticker, "name": stock_info.get('name', ticker), "is_etf": False}
+            return {"valid": False, "ticker": ticker}
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
-            return {"valid": True, "ticker": ticker, "name": stock_info.get('description', '')}
+            return {"valid": True, "ticker": ticker, "name": stock_info.get('description', ''), "is_etf": False}
         else:
             return {"valid": False, "ticker": ticker}
     except Exception as e:
@@ -770,7 +789,9 @@ def get_supported_currencies():
             {"code": "KRW", "name": "Korean Won", "symbol": "₩"},
             {"code": "INR", "name": "Indian Rupee", "symbol": "₹"},
             {"code": "AUD", "name": "Australian Dollar", "symbol": "A$"},
+            {"code": "NZD", "name": "New Zealand Dollar", "symbol": "NZ$"},
             {"code": "CAD", "name": "Canadian Dollar", "symbol": "C$"},
+            {"code": "SGD", "name": "Singapore Dollar", "symbol": "S$"},
         ]
     }
 

@@ -786,7 +786,18 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
             
             result = {
                 'ticker': ticker,
+                'name': info.get('longName') or info.get('shortName'),
+                'description': info.get('longBusinessSummary') or info.get('longName') or info.get('shortName'),
+                'sector': info.get('sector'),
+                'industry': info.get('industry'),
+                'currency': info.get('currency', 'USD'),
                 'current_price': info.get('currentPrice') or info.get('regularMarketPrice') or info.get('lastPrice') or info.get('price'),
+                'percent_change': info.get('regularMarketChangePercent', 0),
+                'change': info.get('regularMarketChange', 0),
+                'open': info.get('regularMarketOpen') or info.get('open'),
+                'previous_close': info.get('previousClose') or info.get('regularMarketPreviousClose'),
+                'high': info.get('dayHigh') or info.get('regularMarketDayHigh'),
+                'low': info.get('dayLow') or info.get('regularMarketDayLow'),
                 'market_cap': info.get('marketCap'),
                 'pe_ratio': info.get('trailingPE') or info.get('forwardPE'),
                 'dividend_yield': info.get('dividendYield'),

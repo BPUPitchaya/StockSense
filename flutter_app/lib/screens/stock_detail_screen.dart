@@ -29,6 +29,27 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   DateTime? _buyDate;
   bool _useTotalAmount = false;
 
+  /// Currency symbols for native formatting
+  static const _currencySymbols = {
+    'USD': '\$', 'AUD': 'A\$', 'NZD': 'NZ\$', 'GBP': '£',
+    'EUR': '€', 'JPY': '¥', 'CNY': '¥', 'CAD': 'C\$',
+    'HKD': 'HK\$', 'SGD': 'S\$', 'KRW': '₩', 'INR': '₹',
+  };
+
+  /// Format a price in the stock's native currency (no conversion).
+  /// Falls back to user's CurrencyService if currency unknown.
+  String _fmtPrice(double price) {
+    final nativeCurrency = stockInfo?['currency'] as String?;
+    if (nativeCurrency != null && nativeCurrency != 'USD') {
+      final sym = _currencySymbols[nativeCurrency] ?? nativeCurrency;
+      if (nativeCurrency == 'JPY' || nativeCurrency == 'KRW') {
+        return '$sym${price.toStringAsFixed(0)}';
+      }
+      return '$sym${price.toStringAsFixed(2)}';
+    }
+    return CurrencyService.format(price);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -416,17 +437,13 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 ),
               ),
             const SizedBox(height: 16),
-            Text('Current Price: ${CurrencyService.format(widget.signal.currentPrice)}'),
+            Text('Current Price: ${_fmtPrice(widget.signal.currentPrice)}'),
             if (stockInfo != null && stockInfo!['unit'] != null)
               Text('Unit: ${stockInfo!['unit']}'),
-            if (stockInfo != null && stockInfo!['grams'] != null)
-              Text('(${stockInfo!['grams']} grams)'),
-            if (stockInfo != null && stockInfo!['currency'] != null)
-              Text('Currency: ${stockInfo!['currency']}'),
             if (widget.signal.ma50 != null)
-              Text('50-day MA: ${CurrencyService.format(widget.signal.ma50!)}'),
+              Text('50-day MA: ${_fmtPrice(widget.signal.ma50!)}'),
             if (widget.signal.ma200 != null)
-              Text('200-day MA: ${CurrencyService.format(widget.signal.ma200!)}'),
+              Text('200-day MA: ${_fmtPrice(widget.signal.ma200!)}'),
             if (widget.signal.rsi != null)
               Text('RSI: ${widget.signal.rsi!.toStringAsFixed(2)}'),
             const SizedBox(height: 16),
@@ -580,10 +597,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                         reservedSize: 52,
                         interval: yInterval,
                         getTitlesWidget: (value, meta) {
-                          final converted = CurrencyService.convert(value);
-                          final label = converted >= 1000
-                              ? '${CurrencyService.symbol}${(converted / 1000).toStringAsFixed(1)}k'
-                              : '${CurrencyService.symbol}${converted.toStringAsFixed(0)}';
+                          final label = _fmtPrice(value);
                           return Text(label, style: const TextStyle(fontSize: 9));
                         },
                       ),
@@ -624,7 +638,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                         final labels = ['Price', 'MA50', 'MA200'];
                         final idx = s.barIndex.clamp(0, 2);
                         return LineTooltipItem(
-                          '${labels[idx]}: ${CurrencyService.format(s.y)}',
+                          '${labels[idx]}: ${_fmtPrice(s.y)}',
                           TextStyle(color: colors[idx], fontSize: 11, fontWeight: FontWeight.bold),
                         );
                       }).toList(),
@@ -669,7 +683,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             if (historicalData.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Data Points: ${historicalData.length}'),
-              Text('Price Range: ${CurrencyService.format(historicalData.map((d) => d.low).reduce((a, b) => a < b ? a : b))} - ${CurrencyService.format(historicalData.map((d) => d.high).reduce((a, b) => a > b ? a : b))}'),
+              Text('Price Range: ${_fmtPrice(historicalData.map((d) => d.low).reduce((a, b) => a < b ? a : b))} - ${_fmtPrice(historicalData.map((d) => d.high).reduce((a, b) => a > b ? a : b))}'),
             ],
           ],
         ),
@@ -698,15 +712,15 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             ),
             const SizedBox(height: 16),
             // Price data — always available from Finnhub quote
-            _buildInfoRow('Open', CurrencyService.format((info['open'] as num?)?.toDouble() ?? 0)),
-            _buildInfoRow('Prev Close', CurrencyService.format((info['previous_close'] as num?)?.toDouble() ?? 0)),
-            _buildInfoRow("Day's High", CurrencyService.format((info['high'] as num?)?.toDouble() ?? 0)),
-            _buildInfoRow("Day's Low", CurrencyService.format((info['low'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow('Open', _fmtPrice((info['open'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow('Prev Close', _fmtPrice((info['previous_close'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow("Day's High", _fmtPrice((info['high'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow("Day's Low", _fmtPrice((info['low'] as num?)?.toDouble() ?? 0)),
             // Technical indicators — computed from 1y history, cached
             if (info['ma50'] != null)
-              _buildInfoRow('MA 50', CurrencyService.format((info['ma50'] as num).toDouble())),
+              _buildInfoRow('MA 50', _fmtPrice((info['ma50'] as num).toDouble())),
             if (info['ma200'] != null)
-              _buildInfoRow('MA 200', CurrencyService.format((info['ma200'] as num).toDouble())),
+              _buildInfoRow('MA 200', _fmtPrice((info['ma200'] as num).toDouble())),
             if (info['volume_ratio'] != null)
               _buildInfoRow('Volume vs Avg', '${(info['volume_ratio'] as num).toStringAsFixed(2)}x'),
             // Company info — always available from Finnhub profile
