@@ -538,6 +538,9 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
+        current = database.get_personal_watchlist(user_id=user_id)
+        if len(current) >= 5:
+            raise HTTPException(status_code=400, detail="Watchlist limit reached (max 5 stocks)")
         success = database.add_to_watchlist(request.ticker, user_id=user_id)
         if success:
             return {"message": "Stock added to watchlist"}

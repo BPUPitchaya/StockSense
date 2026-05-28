@@ -77,6 +77,14 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   Future<void> _addToPersonalWatchlist(String ticker) async {
+    if (personalWatchlist.length >= 5) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Watchlist is full (max 5 stocks). Remove one first.')),
+        );
+      }
+      return;
+    }
     try {
       // Validate stock before adding
       final validation = await ApiService.validateStock(ticker);
@@ -87,7 +95,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
             SnackBar(content: Text('Cannot add $ticker: ${validation['reason']}')),
           );
         }
-        return; // Don't add if invalid
+        return;
       }
       
       if (validation['is_etf']) {
@@ -96,12 +104,12 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
             const SnackBar(content: Text('ETFs are not supported for predictions')),
           );
         }
-        return; // Don't add if ETF
+        return;
       }
       
       await ApiService.addToPersonalWatchlist(ticker);
       await _loadPersonalWatchlist();
-      await _loadPredictions(); // Reload predictions to use new watchlist
+      await _loadPredictions();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -209,10 +217,10 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Flexible(
+              Flexible(
                 child: Text(
-                  '⭐ My Watchlist',
-                  style: TextStyle(
+                  '⭐ My Watchlist  (${personalWatchlist.length}/5)',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -221,12 +229,10 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
-                onPressed: _showAddToWatchlistDialog,
+                onPressed: personalWatchlist.length >= 5 ? null : _showAddToWatchlistDialog,
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Add'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),

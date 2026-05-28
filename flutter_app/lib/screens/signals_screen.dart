@@ -106,6 +106,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
   }
 
   Future<void> _addToPersonalWatchlist(String ticker) async {
+    if (personalWatchlist.length >= 5) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Watchlist is full (max 5 stocks). Remove one first.')),
+        );
+      }
+      return;
+    }
     try {
       final validation = await ApiService.validateStock(ticker);
       
@@ -132,7 +140,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added $ticker to personal watchlist')),
+          SnackBar(content: Text('Added $ticker to watchlist')),
         );
       }
     } catch (e) {
