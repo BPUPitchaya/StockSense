@@ -50,8 +50,15 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       }
       return '$sym${price.toStringAsFixed(2)}';
     }
-    // US stock — use user's currency format
-    return CurrencyService.format(price);
+    // US stock — use user's currency symbol only
+    final converted = CurrencyService.convert(price);
+    if (CurrencyService.currency == 'KRW') {
+      return '${converted.toStringAsFixed(0)}${CurrencyService.symbol}';
+    }
+    if (CurrencyService.currency == 'JPY') {
+      return '${CurrencyService.symbol}${converted.toStringAsFixed(0)}';
+    }
+    return '${CurrencyService.symbol}${converted.toStringAsFixed(2)}';
   }
 
   @override
