@@ -582,27 +582,29 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            // Price data — always available from Finnhub quote
+            _buildInfoRow('Open', CurrencyService.format((info['open'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow('Prev Close', CurrencyService.format((info['previous_close'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow("Day's High", CurrencyService.format((info['high'] as num?)?.toDouble() ?? 0)),
+            _buildInfoRow("Day's Low", CurrencyService.format((info['low'] as num?)?.toDouble() ?? 0)),
+            // Technical indicators — computed from 1y history, cached
+            if (info['ma50'] != null)
+              _buildInfoRow('MA 50', CurrencyService.format((info['ma50'] as num).toDouble())),
+            if (info['ma200'] != null)
+              _buildInfoRow('MA 200', CurrencyService.format((info['ma200'] as num).toDouble())),
+            if (info['volume_ratio'] != null)
+              _buildInfoRow('Volume vs Avg', '${(info['volume_ratio'] as num).toStringAsFixed(2)}x'),
+            // Company info — always available from Finnhub profile
             if (info['market_cap'] != null)
               _buildInfoRow('Market Cap', _formatNumber((info['market_cap'] as num) * 1e6)),
-            _buildInfoRow('P/E Ratio', info['pe_ratio']?.toStringAsFixed(2) ?? 'N/A'),
-            _buildInfoRow('Dividend Yield', info['dividend_yield'] != null ? '${((info['dividend_yield'] as num) * 100).toStringAsFixed(2)}%' : 'N/A'),
-            _buildInfoRow('Dividend Rate', info['dividend_rate'] != null ? CurrencyService.format((info['dividend_rate'] as num).toDouble()) : 'N/A'),
-            _buildInfoRow('Beta', info['beta']?.toStringAsFixed(2) ?? 'N/A'),
-            _buildInfoRow('EPS', info['eps'] != null ? CurrencyService.format((info['eps'] as num).toDouble()) : 'N/A'),
-            if (info['avg_volume'] != null)
-              _buildInfoRow('Avg Volume', _formatNumber(info['avg_volume'])),
-            _buildInfoRow('52-Week High', info['52_week_high'] != null ? CurrencyService.format((info['52_week_high'] as num).toDouble()) : 'N/A'),
-            _buildInfoRow('52-Week Low', info['52_week_low'] != null ? CurrencyService.format((info['52_week_low'] as num).toDouble()) : 'N/A'),
-            if (info['profit_margin'] != null)
-              _buildInfoRow('Profit Margin', '${(info['profit_margin'] * 100).toStringAsFixed(2)}%'),
-            if (info['revenue'] != null)
-              _buildInfoRow('Revenue', _formatNumber(info['revenue'])),
+            if (info['exchange'] != null)
+              _buildInfoRow('Exchange', info['exchange']),
+            if (info['country'] != null)
+              _buildInfoRow('Country', info['country']),
             if (info['industry'] != null)
               _buildInfoRow('Industry', info['industry']),
             if (info['sector'] != null)
               _buildInfoRow('Sector', info['sector']),
-            if (info['description'] != null)
-              _buildInfoRow('Description', info['description']),
           ],
         ),
       ),

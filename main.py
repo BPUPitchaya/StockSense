@@ -410,13 +410,18 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
 
 @app.get("/info/{ticker}")
 def get_stock_info_endpoint(ticker: str):
-    """Get stock info with market cap, P/E ratio, etc."""
+    """Get stock info including technical indicators (MA50, MA200, volume)."""
     try:
         stock_info = signals.get_stock_info_finnhub(ticker)
-        if stock_info is not None:
-            return stock_info
-        else:
+        if stock_info is None:
             raise HTTPException(status_code=404, detail="Stock not found")
+        technicals = signals.get_technical_indicators(ticker)
+        stock_info['ma50'] = technicals.get('ma50')
+        stock_info['ma200'] = technicals.get('ma200')
+        stock_info['volume_ratio'] = technicals.get('volume_ratio')
+        return stock_info
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
