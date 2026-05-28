@@ -802,10 +802,30 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
             
             # Add unit/currency info for futures
             if is_futures:
-                result['unit'] = 'per troy ounce' if ticker.startswith('GC') else 'per troy ounce' if ticker.startswith('SI') else 'per contract'
+                _futures_names = {
+                    'GC': ('Gold', 'Commodity · per troy oz'),
+                    'SI': ('Silver', 'Commodity · per troy oz'),
+                    'CL': ('Crude Oil (WTI)', 'Commodity · per barrel'),
+                    'BZ': ('Brent Crude Oil', 'Commodity · per barrel'),
+                    'NG': ('Natural Gas', 'Commodity · per MMBtu'),
+                    'HG': ('Copper', 'Commodity · per lb'),
+                    'PL': ('Platinum', 'Commodity · per troy oz'),
+                    'PA': ('Palladium', 'Commodity · per troy oz'),
+                    'ZC': ('Corn', 'Commodity · per bushel'),
+                    'ZW': ('Wheat', 'Commodity · per bushel'),
+                    'ZS': ('Soybeans', 'Commodity · per bushel'),
+                    'ES': ('S&P 500 Futures', 'Index Future'),
+                    'NQ': ('Nasdaq-100 Futures', 'Index Future'),
+                    'YM': ('Dow Jones Futures', 'Index Future'),
+                    'RTY': ('Russell 2000 Futures', 'Index Future'),
+                }
+                prefix = ticker.replace('=F', '')
+                fname, fdesc = _futures_names.get(prefix, (ticker.replace('=F', ''), 'Futures Contract'))
+                result['name'] = fname
+                result['description'] = fdesc
+                result['unit'] = fdesc
                 result['currency'] = 'USD'
                 result['is_futures'] = True
-                # Add gram equivalent (1 troy ounce = 31.1035 grams)
                 result['grams'] = 31.1035
             # Cache result in Redis (15 min TTL)
             if redis_client:
