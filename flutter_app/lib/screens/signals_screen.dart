@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import '../models/signal.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
 import '../utils/responsive.dart';
+import '../theme.dart';
 import 'stock_detail_screen.dart';
 
 class SignalsScreen extends StatefulWidget {
@@ -164,15 +166,15 @@ class _SignalsScreenState extends State<SignalsScreen> {
   Color _getSignalColor(String signal) {
     switch (signal.toUpperCase()) {
       case 'STRONG BUY':
-        return Colors.green.shade700;
+        return AppColors.up;
       case 'BUY':
-        return Colors.green;
+        return AppColors.up;
       case 'STRONG SELL':
-        return Colors.red.shade700;
+        return AppColors.down;
       case 'SELL':
-        return Colors.red;
+        return AppColors.down;
       default:
-        return Colors.grey;
+        return AppColors.textMuted;
     }
   }
 
@@ -245,8 +247,13 @@ class _SignalsScreenState extends State<SignalsScreen> {
                             ),
                           )
                         : signals.isEmpty
-                            ? const Center(child: Text('No signals available'))
+                            ? const EmptyState(
+                                icon: Icons.trending_up,
+                                title: 'No signals available',
+                                subtitle: 'Pull down to refresh or search for a stock above.',
+                              )
                             : ListView.builder(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
                                 itemCount: signals.length,
                                 itemBuilder: (context, index) {
                                   final signal = signals[index];
@@ -259,95 +266,163 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   Widget _buildSignalCard(Signal signal) {
     final isInWatchlist = inWatchlist[signal.ticker] ?? false;
-    
+    final pc = signal.percentChange;
+    final isUp = (pc ?? 0) >= 0;
+    final changeColor = isUp ? AppColors.up : AppColors.down;
+
     return Card(
-      margin: const EdgeInsets.all(8),
       child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          await Navigator.push(            context,
+          await Navigator.push(
+            context,
             MaterialPageRoute(
               builder: (context) => StockDetailScreen(signal: signal),
             ),
           );
-          if (mounted) {
-            _clearSearch();
-          }
+          if (mounted) _clearSearch();
         },
-        child: ListTile(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                signal.ticker,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  isInWatchlist ? Icons.star : Icons.star_border,
-                  color: isInWatchlist ? Colors.black : null,
-                ),
-                onPressed: () {
-                  if (isInWatchlist) {
-                    _removeFromPersonalWatchlist(signal.ticker);
-                  } else {
-                    _addToPersonalWatchlist(signal.ticker);
-                  }
-                },
-                tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
-              ),
-            ],
-          ),
-          subtitle: Column(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (signal.name != null)
+              // Top row: ticker + signal pill + star
+              Row(
+                children: [
+                  Text(
+                    signal.ticker,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SignalPill(
+                    label: signal.signal.toUpperCase(),
+                    color: _getSignalColor(signal.signal),
+                    subtle: true,
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      if (isInWatchlist) {
+                        _removeFromPersonalWatchlist(signal.ticker);
+                      } else {
+                        _addToPersonalWatchlist(signal.ticker);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        isInWatchlist ? Icons.star : Icons.star_border,
+                        size: 20,
+                        color: isInWatchlist ? AppColors.text : AppColors.textFaint,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (signal.name != null) ...[
+                const SizedBox(height: 2),
                 Text(
                   signal.name!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
-              const SizedBox(height: 8),
-              Text('Current Price: ${_formatPrice(signal.currentPrice)}'),
-              if (signal.ma50 != null)
-                Text('50-day MA: ${_formatPrice(signal.ma50!)}'),
-              if (signal.ma200 != null)
-                Text('200-day MA: ${_formatPrice(signal.ma200!)}'),
-              if (signal.rsi != null)
-                Text('RSI: ${signal.rsi!.toStringAsFixed(2)}'),
-              if (signal.percentChange != null)
-                Text(
-                  "Today's Change: ${signal.percentChange! >= 0 ? '+' : ''}${signal.percentChange!.toStringAsFixed(2)}%",
-                  style: TextStyle(
-                    color: signal.percentChange! >= 0 ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
+              ],
+              const SizedBox(height: 12),
+              // Price + change row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatPrice(signal.currentPrice),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.text,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
                   ),
+                  const SizedBox(width: 10),
+                  if (pc != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isUp ? Icons.arrow_upward : Icons.arrow_downward,
+                            size: 14,
+                            color: changeColor,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${pc.abs().toStringAsFixed(2)}%',
+                            style: TextStyle(
+                              color: changeColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              if (signal.ma50 != null || signal.ma200 != null || signal.rsi != null) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (signal.ma50 != null)
+                      _miniStat('MA50', _formatPrice(signal.ma50!)),
+                    if (signal.ma200 != null)
+                      _miniStat('MA200', _formatPrice(signal.ma200!)),
+                    if (signal.rsi != null)
+                      _miniStat('RSI', signal.rsi!.toStringAsFixed(1)),
+                  ],
                 ),
+              ],
             ],
           ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: _getSignalColor(signal.signal),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              signal.signal,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textFaint,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
-        ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.text,
+              fontWeight: FontWeight.w600,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
       ),
     );
   }
