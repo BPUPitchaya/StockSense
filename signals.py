@@ -425,16 +425,54 @@ def analyze_stock(ticker: str) -> Optional[Dict]:
     return indicators
 
 
-def calculate_signal_score(current_price: float, open_price: float, 
+def get_technical_indicators(ticker: str) -> dict:
+    """Compute MA50, MA200, and volume ratio from cached history. Returns {} on failure."""
+    cache_key = f"technicals:{ticker}"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+    try:
+        df = get_stock_data(ticker, period="1y")
+        if df is None or len(df) < 20:
+            return {}
+        closes = df['Close']
+        volumes = df['Volume']
+        result = {}
+        if len(closes) >= 50:
+            result['ma50'] = float(closes.rolling(50).mean().iloc[-1])
+        if len(closes) >= 200:
+            result['ma200'] = float(closes.rolling(200).mean().iloc[-1])
+        if len(volumes) >= 20:
+            avg_vol = float(volumes.iloc[-21:-1].mean())  # 20-day avg excluding today
+            today_vol = float(volumes.iloc[-1])
+            result['volume_ratio'] = today_vol / avg_vol if avg_vol > 0 else 1.0
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 3600, json.dumps(result))  # 1h cache
+            except Exception:
+                pass
+        return result
+    except Exception as e:
+        print(f"Error computing technicals for {ticker}: {e}")
+        return {}
+
+
+def calculate_signal_score(current_price: float, open_price: float,
                            previous_close: float, percent_change: float,
-                           high: float = None, low: float = None) -> tuple:
+                           high: float = None, low: float = None,
+                           ma50: float = None, ma200: float = None,
+                           volume_ratio: float = None) -> tuple:
     """
     Calculate signal score based on multiple factors:
     Returns (signal, score, reasoning)
     """
     score = 0
     reasons = []
-    
+
     # Factor 1: Daily percent change (momentum)
     if percent_change > 3:
         score += 3
@@ -454,7 +492,7 @@ def calculate_signal_score(current_price: float, open_price: float,
     elif percent_change < -0.5:
         score -= 1
         reasons.append("Slight downward trend")
-    
+
     # Factor 2: Price vs Open (intraday trend)
     if current_price > open_price * 1.02:
         score += 2
@@ -468,7 +506,7 @@ def calculate_signal_score(current_price: float, open_price: float,
     elif current_price < open_price:
         score -= 1
         reasons.append("Below opening price")
-    
+
     # Factor 3: Price vs Previous Close (trend continuation)
     if current_price > previous_close * 1.01:
         score += 1
@@ -476,7 +514,7 @@ def calculate_signal_score(current_price: float, open_price: float,
     elif current_price < previous_close * 0.99:
         score -= 1
         reasons.append("Below previous close")
-    
+
     # Factor 4: Position within daily range
     if high and low and high > low:
         range_position = (current_price - low) / (high - low)
@@ -486,19 +524,67 @@ def calculate_signal_score(current_price: float, open_price: float,
         elif range_position < 0.2:
             score -= 1
             reasons.append("Near daily low")
-    
+
+    # Factor 5: MA50 (short-term trend)
+    if ma50 and current_price:
+        if current_price > ma50 * 1.02:
+            score += 2
+            reasons.append("Price well above MA50 (bullish)")
+        elif current_price > ma50:
+            score += 1
+            reasons.append("Price above MA50")
+        elif current_price < ma50 * 0.98:
+            score -= 2
+            reasons.append("Price well below MA50 (bearish)")
+        elif current_price < ma50:
+            score -= 1
+            reasons.append("Price below MA50")
+
+    # Factor 6: MA200 (long-term trend)
+    if ma200 and current_price:
+        if current_price > ma200:
+            score += 1
+            reasons.append("Price above MA200 (long-term uptrend)")
+        else:
+            score -= 1
+            reasons.append("Price below MA200 (long-term downtrend)")
+
+    # Factor 7: MA50 vs MA200 crossover (golden/death cross)
+    if ma50 and ma200:
+        if ma50 > ma200 * 1.01:
+            score += 1
+            reasons.append("Golden cross: MA50 above MA200")
+        elif ma50 < ma200 * 0.99:
+            score -= 1
+            reasons.append("Death cross: MA50 below MA200")
+
+    # Factor 8: Volume confirmation
+    if volume_ratio is not None:
+        if volume_ratio > 2.0 and percent_change > 0:
+            score += 2
+            reasons.append(f"High volume buying ({volume_ratio:.1f}x avg)")
+        elif volume_ratio > 1.5 and percent_change > 0:
+            score += 1
+            reasons.append(f"Above-average volume on up day ({volume_ratio:.1f}x)")
+        elif volume_ratio > 2.0 and percent_change < 0:
+            score -= 2
+            reasons.append(f"High volume selling ({volume_ratio:.1f}x avg)")
+        elif volume_ratio > 1.5 and percent_change < 0:
+            score -= 1
+            reasons.append(f"Above-average volume on down day ({volume_ratio:.1f}x)")
+
     # Determine signal
-    if score >= 4:
+    if score >= 5:
         signal = "Strong Buy"
     elif score >= 2:
         signal = "Buy"
-    elif score <= -4:
+    elif score <= -5:
         signal = "Strong Sell"
     elif score <= -2:
         signal = "Sell"
     else:
         signal = "Hold"
-    
+
     return signal, score, reasons
 
 
@@ -518,10 +604,16 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
             previous_close = stock_info.get('previous_close', current_price)
             high = stock_info.get('high')
             low = stock_info.get('low')
-            
+
+            # Get technical indicators (MA50, MA200, volume) from cached history
+            technicals = get_technical_indicators(ticker)
+
             # Use shared signal calculation
             signal, score, reasons = calculate_signal_score(
-                current_price, open_price, previous_close, percent_change, high, low
+                current_price, open_price, previous_close, percent_change, high, low,
+                ma50=technicals.get('ma50'),
+                ma200=technicals.get('ma200'),
+                volume_ratio=technicals.get('volume_ratio'),
             )
             
             # Convert all values to Python native types for JSON serialization
@@ -545,6 +637,9 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
                 'low': to_native(stock_info.get('low')),
                 'open': to_native(stock_info.get('open')),
                 'previous_close': to_native(stock_info.get('previous_close')),
+                'ma50': to_native(technicals.get('ma50')),
+                'ma200': to_native(technicals.get('ma200')),
+                'volume_ratio': to_native(technicals.get('volume_ratio')),
                 'market_cap': to_native(stock_info.get('market_cap')),
                 'pe_ratio': to_native(stock_info.get('pe_ratio')),
                 'beta': to_native(stock_info.get('beta')),
