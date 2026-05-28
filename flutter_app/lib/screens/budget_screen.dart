@@ -199,24 +199,19 @@ class _BudgetScreenState extends State<BudgetScreen> {
               const SizedBox(height: 20),
               // Recommendations Section
               if (_recommendations != null) ...[
-                if (_recommendations!['message'] != null)
-                  Card(
-                    color: _recommendations!['market_condition'] == 'bearish'
-                        ? Colors.orange.shade50
-                        : Colors.green.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        _recommendations!['message'],
-                        style: TextStyle(
-                          color: _recommendations!['market_condition'] == 'bearish'
-                              ? Colors.orange.shade900
-                              : Colors.green.shade900,
-                          fontWeight: FontWeight.bold,
-                        ),
+                Card(
+                  color: Colors.green.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'Based on your ${CurrencyService.format((_recommendations!['total_budget'] as num).toDouble())} budget',
+                      style: TextStyle(
+                        color: Colors.green.shade900,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                ),
                 const SizedBox(height: 12),
                 _buildRecommendations(),
               ],
