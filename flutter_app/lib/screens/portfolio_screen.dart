@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/position.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 
 class PortfolioScreen extends StatefulWidget {
   const PortfolioScreen({super.key});
@@ -203,23 +204,24 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Error: $error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadPortfolio,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
+      body: ResponsiveBody(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: $error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadPortfolio,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
                   children: [
                     // Portfolio Value Card
                     Card(
@@ -310,6 +312,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     ),
                   ],
                 ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddPositionDialog,
         child: const Icon(Icons.add),

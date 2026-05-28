@@ -5,6 +5,7 @@ import '../models/historical_data.dart';
 import '../models/position.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 
 class StockDetailScreen extends StatefulWidget {
   final Signal signal;
@@ -370,7 +371,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                     ],
                   ),
                 )
-              : SingleChildScrollView(
+              : ResponsiveBody(
+                  child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,6 +387,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                       const SizedBox(height: 24),
                       _buildDescriptionSection(),
                     ],
+                  ),
                   ),
                 ),
     );
@@ -461,77 +464,173 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       );
     }
 
+    final prices = historicalData.map((d) => d.close).toList();
+    final rawMin = prices.reduce((a, b) => a < b ? a : b);
+    final rawMax = prices.reduce((a, b) => a > b ? a : b);
+    final padding = (rawMax - rawMin) * 0.1;
+    final minY = rawMin - padding;
+    final maxY = rawMax + padding;
+    final yRange = maxY - minY;
+
+    // Show ~4 evenly spaced labels on Y axis
+    final yInterval = yRange / 4;
+
+    // Show ~5 date labels across the bottom
+    final xInterval = (historicalData.length / 5).ceilToDouble();
+
+    // MA lines (in USD from Signal object)
+    final ma50Val = widget.signal.ma50;
+    final ma200Val = widget.signal.ma200;
+
+    final List<LineChartBarData> lines = [
+      LineChartBarData(
+        spots: historicalData.asMap().entries.map((e) =>
+            FlSpot(e.key.toDouble(), e.value.close)).toList(),
+        isCurved: true,
+        color: Colors.blue,
+        barWidth: 2,
+        dotData: FlDotData(show: false),
+        belowBarData: BarAreaData(
+          show: true,
+          color: Colors.blue.withOpacity(0.08),
+        ),
+      ),
+      if (ma50Val != null && ma50Val >= minY && ma50Val <= maxY)
+        LineChartBarData(
+          spots: [FlSpot(0, ma50Val), FlSpot((historicalData.length - 1).toDouble(), ma50Val)],
+          isCurved: false,
+          color: Colors.orange,
+          barWidth: 1.5,
+          dotData: FlDotData(show: false),
+          dashArray: [6, 4],
+        ),
+      if (ma200Val != null && ma200Val >= minY && ma200Val <= maxY)
+        LineChartBarData(
+          spots: [FlSpot(0, ma200Val), FlSpot((historicalData.length - 1).toDouble(), ma200Val)],
+          isCurved: false,
+          color: Colors.red,
+          barWidth: 1.5,
+          dotData: FlDotData(show: false),
+          dashArray: [6, 4],
+        ),
+    ];
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Price Chart (3 Months)',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: const Text(
+                'Price Chart (3 Months)',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
-            const SizedBox(height: 16),
+            // Legend
+            if (ma50Val != null || ma200Val != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 8, top: 8),
+                child: Wrap(
+                  spacing: 16,
+                  children: [
+                    _buildLegendItem(Colors.blue, 'Price'),
+                    if (ma50Val != null) _buildLegendItem(Colors.orange, 'MA50'),
+                    if (ma200Val != null) _buildLegendItem(Colors.red, 'MA200'),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
             SizedBox(
-              height: 300,
+              height: 260,
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: false),
+                  minY: minY,
+                  maxY: maxY,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: yInterval,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey.withOpacity(0.2),
+                      strokeWidth: 1,
+                    ),
+                  ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 60,
+                        reservedSize: 52,
+                        interval: yInterval,
                         getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${CurrencyService.symbol}${CurrencyService.convert(value).toInt()}',
-                            style: const TextStyle(fontSize: 10),
-                          );
+                          final converted = CurrencyService.convert(value);
+                          final label = converted >= 1000
+                              ? '${CurrencyService.symbol}${(converted / 1000).toStringAsFixed(1)}k'
+                              : '${CurrencyService.symbol}${converted.toStringAsFixed(0)}';
+                          return Text(label, style: const TextStyle(fontSize: 9));
                         },
                       ),
                     ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
+                        reservedSize: 28,
+                        interval: xInterval,
                         getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < historicalData.length) {
-                            return Text(
-                              historicalData[value.toInt()].date.substring(5),
-                              style: const TextStyle(fontSize: 10),
-                            );
-                          }
-                          return const Text('');
+                          final i = value.toInt();
+                          if (i < 0 || i >= historicalData.length) return const Text('');
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              historicalData[i].date.substring(5),
+                              style: const TextStyle(fontSize: 9),
+                            ),
+                          );
                         },
-                        interval: historicalData.length > 30 ? 5 : 1,
                       ),
                     ),
                     topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: historicalData.asMap().entries.map((entry) {
-                        return FlSpot(
-                          entry.key.toDouble(),
-                          entry.value.close,
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                      left: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                  ),
+                  lineBarsData: lines,
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
+                        final colors = [Colors.blue, Colors.orange, Colors.red];
+                        final labels = ['Price', 'MA50', 'MA200'];
+                        final idx = s.barIndex.clamp(0, 2);
+                        return LineTooltipItem(
+                          '${labels[idx]}: ${CurrencyService.format(s.y)}',
+                          TextStyle(color: colors[idx], fontSize: 11, fontWeight: FontWeight.bold),
                         );
                       }).toList(),
-                      isCurved: true,
-                      color: Colors.blue,
-                      barWidth: 2,
-                      dotData: FlDotData(show: false),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 16, height: 2, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ],
     );
   }
 
@@ -649,13 +748,23 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey),
+            ),
           ),
-          Text(value),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
         ],
       ),
     );

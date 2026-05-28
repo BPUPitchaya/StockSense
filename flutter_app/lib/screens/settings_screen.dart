@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -102,11 +103,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: ResponsiveBody(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const Text(
               'API Configuration',
               style: TextStyle(
@@ -137,9 +139,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _saveSettings,
-              child: const Text('Save Settings'),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saveSettings,
+                child: const Text('Save Settings'),
+              ),
             ),
             const SizedBox(height: 32),
             const Divider(),
@@ -190,7 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
               onTap: _logout,
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

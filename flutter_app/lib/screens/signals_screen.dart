@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/signal.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 import 'stock_detail_screen.dart';
 
 class SignalsScreen extends StatefulWidget {
@@ -222,35 +223,37 @@ class _SignalsScreenState extends State<SignalsScreen> {
           ),
         ),
       ),
-      body: isSearching
-          ? const Center(child: CircularProgressIndicator())
-          : searchedSignal != null
-              ? _buildSignalCard(Signal.fromJson(searchedSignal!))
-              : isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Error: $error'),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadSignals,
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : signals.isEmpty
-                          ? const Center(child: Text('No signals available'))
-                          : ListView.builder(
-                              itemCount: signals.length,
-                              itemBuilder: (context, index) {
-                                final signal = signals[index];
-                                return _buildSignalCard(signal);
-                              },
+      body: ResponsiveBody(
+        child: isSearching
+            ? const Center(child: CircularProgressIndicator())
+            : searchedSignal != null
+                ? _buildSignalCard(Signal.fromJson(searchedSignal!))
+                : isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Error: $error'),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _loadSignals,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
                             ),
+                          )
+                        : signals.isEmpty
+                            ? const Center(child: Text('No signals available'))
+                            : ListView.builder(
+                                itemCount: signals.length,
+                                itemBuilder: (context, index) {
+                                  final signal = signals[index];
+                                  return _buildSignalCard(signal);
+                                },
+                              ),
+      ),
     );
   }
 

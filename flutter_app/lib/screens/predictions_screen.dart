@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 
 class PredictionsScreen extends StatefulWidget {
   const PredictionsScreen({super.key});
@@ -167,33 +168,35 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       appBar: AppBar(
         title: const Text('Predictions'),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Error: $error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadPredictions,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+      body: ResponsiveBody(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: $error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadPredictions,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadPredictions,
+                    child: ListView(
+                      children: [
+                        _buildPersonalWatchlistSection(),
+                        _buildGainersSection(),
+                        _buildLosersSection(),
+                        _buildHoldSection(),
+                      ],
+                    ),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadPredictions,
-                  child: ListView(
-                    children: [
-                      _buildPersonalWatchlistSection(),
-                      _buildGainersSection(),
-                      _buildLosersSection(),
-                      _buildHoldSection(),
-                    ],
-                  ),
-                ),
+      ),
     );
   }
 
@@ -206,20 +209,25 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '⭐ Personal Watchlist',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              const Flexible(
+                child: Text(
+                  '⭐ My Watchlist',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: _showAddToWatchlistDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Stock'),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
+import '../utils/responsive.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -104,9 +105,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
         title: const Text('Budget & Recommendations'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: ResponsiveBody(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -150,11 +151,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _setBudget,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text('Set Budget & Get Recommendations'),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _setBudget,
+                          child: _isLoading
+                              ? const CircularProgressIndicator()
+                              : const Text('Set Budget & Get Recommendations'),
+                        ),
                       ),
                     ],
                   ),
