@@ -16,6 +16,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Map<String, dynamic>? _recommendations;
   bool _isLoading = false;
   String? _errorMessage;
+  // Snapshot of currency at the time recommendations were fetched
+  String _snapCurrency = 'USD';
+  String _snapSymbol = '\$';
+  Map<String, dynamic> _snapRates = {};
 
   @override
   void initState() {
@@ -73,7 +77,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
       await ApiService.setBudget(amountUsd);
       await _loadBudget();
       await _getRecommendations();
+      // Snapshot currency state for display
       setState(() {
+        _snapCurrency = CurrencyService.currency;
+        _snapSymbol = CurrencyService.symbol;
+        _snapRates = Map<String, dynamic>.from({});
         _isLoading = false;
       });
     } catch (e) {
@@ -92,8 +100,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     try {
       final recommendations = await ApiService.getBudgetRecommendations();
+      await CurrencyService.load();
       setState(() {
         _recommendations = recommendations;
+        _snapCurrency = CurrencyService.currency;
+        _snapSymbol = CurrencyService.symbol;
         _isLoading = false;
       });
     } catch (e) {
@@ -216,6 +227,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
   }
 
+  /// Format a USD amount using the current user currency (rates are loaded before this is called)
+  String _fmtBudget(double usdAmount) => CurrencyService.format(usdAmount);
+
   Widget _buildRecommendations() {
     final recommendations = _recommendations!;
     final stockRecommendations = recommendations['recommendations'] as List<dynamic>? ?? [];
@@ -234,15 +248,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Total Budget: ${CurrencyService.format(((recommendations['total_budget'] ?? 0) as num).toDouble())}',
+              'Total Budget: ${_fmtBudget(((recommendations['total_budget'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16),
             ),
             Text(
-              'Total Allocated: ${CurrencyService.format(((recommendations['total_allocated'] ?? 0) as num).toDouble())}',
+              'Total Allocated: ${_fmtBudget(((recommendations['total_allocated'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16, color: Colors.green),
             ),
             Text(
-              'Remaining: ${CurrencyService.format(((recommendations['remaining_budget'] ?? 0) as num).toDouble())}',
+              'Remaining: ${_fmtBudget(((recommendations['remaining_budget'] ?? 0) as num).toDouble())}',
               style: const TextStyle(fontSize: 16, color: Colors.orange),
             ),
             const SizedBox(height: 20),
@@ -295,10 +309,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Current Price: ${CurrencyService.format((stock['current_price'] as num).toDouble())}'),
+                      Text('Current Price: ${_fmtBudget((stock['current_price'] as num).toDouble())}'),
                       Text('Shares to Buy: ${stock['shares'].toStringAsFixed(4)}'),
                       Text(
-                        'Amount to Invest: ${CurrencyService.format((stock['actual_amount'] as num).toDouble())}',
+                        'Amount to Invest: ${_fmtBudget((stock['actual_amount'] as num).toDouble())}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
