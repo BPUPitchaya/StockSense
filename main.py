@@ -442,9 +442,15 @@ def search_stock(ticker: str):
     try:
         stock_info = signals.get_stock_info_finnhub(ticker)
         if stock_info:
+            technicals = signals.get_technical_indicators(ticker)
+            stock_info['ma50'] = technicals.get('ma50')
+            stock_info['ma200'] = technicals.get('ma200')
+            stock_info['volume_ratio'] = technicals.get('volume_ratio')
             return stock_info
         else:
             raise HTTPException(status_code=404, detail="Stock not found or not supported (US market only)")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
