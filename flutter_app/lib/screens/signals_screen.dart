@@ -50,7 +50,16 @@ class _SignalsScreenState extends State<SignalsScreen> {
     }
   }
 
-  String _formatPrice(double usdPrice) => CurrencyService.format(usdPrice);
+  String _formatPrice(double usdPrice) {
+    final converted = CurrencyService.convert(usdPrice);
+    if (CurrencyService.currency == 'KRW') {
+      return '${converted.toStringAsFixed(0)}${CurrencyService.symbol}';
+    }
+    if (CurrencyService.currency == 'JPY') {
+      return '${CurrencyService.symbol}${converted.toStringAsFixed(0)}';
+    }
+    return '${CurrencyService.symbol}${converted.toStringAsFixed(2)}';
+  }
 
   Future<void> _loadSignals() => _loadAll();
 
