@@ -188,9 +188,20 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: searchedSignal == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && searchedSignal != null) _clearSearch();
+      },
+      child: Scaffold(
       appBar: AppBar(
-        title: const Text('Trading Signals'),
+        title: Text(searchedSignal != null ? 'Search Result' : 'Trading Signals'),
+        leading: searchedSignal != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _clearSearch,
+              )
+            : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -269,7 +280,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                                 },
                               ),
       ),
-    );
+    ));
   }
 
   Widget _buildSignalCard(Signal signal) {
