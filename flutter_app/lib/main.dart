@@ -13,18 +13,35 @@ import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 
-void main() {
+final themeService = ThemeService();
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await themeService.load();
   runApp(const StockzApp());
 }
 
-class StockzApp extends StatelessWidget {
+class StockzApp extends StatefulWidget {
   const StockzApp({super.key});
+
+  @override
+  State<StockzApp> createState() => _StockzAppState();
+}
+
+class _StockzAppState extends State<StockzApp> {
+  @override
+  void initState() {
+    super.initState();
+    themeService.addListener(() { if (mounted) setState(() {}); });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Stockz',
       theme: buildAppTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: themeService.mode,
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {

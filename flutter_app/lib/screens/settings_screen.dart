@@ -3,6 +3,8 @@ import '../config.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
 import '../utils/responsive.dart';
+import '../main.dart' show themeService;
+import '../theme.dart' show ThemeService;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -187,6 +189,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: const TextStyle(color: Colors.grey),
                 ),
               ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            const Text(
+              'Appearance',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ListenableBuilder(
+              listenable: themeService,
+              builder: (context, _) {
+                return SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode), label: Text('Light')),
+                    ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('System')),
+                    ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode), label: Text('Dark')),
+                  ],
+                  selected: {themeService.mode},
+                  onSelectionChanged: (s) => themeService.setMode(s.first),
+                );
+              },
+            ),
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
