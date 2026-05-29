@@ -859,50 +859,26 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         import yfinance as yf
         
         stock = yf.Ticker(ticker)
+        info = stock.info
         
-        # Try fast_info first (faster, more reliable)
-        try:
-            fast_info = stock.fast_info
-            premarket_price = fast_info.get('last_price')
-            previous_close = fast_info.get('previous_close')
+        premarket_price = info.get('preMarketPrice')
+        previous_close = info.get('previousClose')
+        
+        if premarket_price and previous_close:
+            change = premarket_price - previous_close
+            percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
             
-            if premarket_price and previous_close:
-                change = premarket_price - previous_close
-                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
-                
-                print(f"Premarket data for {ticker} (yfinance fast_info): ${premarket_price} ({percent_change:.2f}%)")
-                
-                return {
-                    'premarket_price': premarket_price,
-                    'premarket_change': change,
-                    'premarket_percent_change': percent_change,
-                    'is_premarket': True
-                }
-        except Exception as e:
-            print(f"fast_info failed for {ticker}: {e}")
-        
-        # Fallback to regular info
-        try:
-            info = stock.info
-            premarket_price = info.get('preMarketPrice')
-            previous_close = info.get('previousClose')
+            print(f"Premarket data for {ticker} (yfinance): ${premarket_price} ({percent_change:.2f}%)")
             
-            if premarket_price and previous_close:
-                change = premarket_price - previous_close
-                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
-                
-                print(f"Premarket data for {ticker} (yfinance info): ${premarket_price} ({percent_change:.2f}%)")
-                
-                return {
-                    'premarket_price': premarket_price,
-                    'premarket_change': change,
-                    'premarket_percent_change': percent_change,
-                    'is_premarket': True
-                }
-        except Exception as e:
-            print(f"info failed for {ticker}: {e}")
+            return {
+                'premarket_price': premarket_price,
+                'premarket_change': change,
+                'premarket_percent_change': percent_change,
+                'is_premarket': True
+            }
+        else:
+            print(f"No premarket price for {ticker} - preMarketPrice: {premarket_price}, previousClose: {previous_close}")
         
-        print(f"No premarket price for {ticker}")
         return {
             'is_premarket': True,
             'premarket_price': None,
