@@ -1,24 +1,50 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String? token;
+  
+  const ResetPasswordScreen({super.key, this.token});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
-  final TextEditingController _emailController = TextEditingController();
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   bool isLoading = false;
   String? errorMessage;
 
-  Future<void> _signup() async {
+  @override
+  void initState() {
+    super.initState();
+    // Extract token from URL if not provided directly
+    if (widget.token == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final token = ModalRoute.of(context)?.settings.arguments as String?;
+        if (token != null) {
+          // In a real app, you'd handle deep linking here
+          // For now, show error if no token
+          setState(() {
+            errorMessage = 'Invalid or missing reset token';
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _resetPassword() async {
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
         errorMessage = 'Passwords do not match';
+      });
+      return;
+    }
+
+    if (widget.token == null) {
+      setState(() {
+        errorMessage = 'Invalid reset link';
       });
       return;
     }
@@ -29,22 +55,19 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      final response = await ApiService.signup(
-        _emailController.text,
-        _passwordController.text,
-      );
+      await ApiService.resetPassword(widget.token!, _passwordController.text);
 
       if (mounted) {
         setState(() {
           isLoading = false;
         });
         
-        // Show verification message
+        // Show success message and navigate to login
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Account Created'),
-            content: Text(response['message'] ?? 'Please check your email to verify your account.'),
+            title: const Text('Password Reset'),
+            content: const Text('Your password has been reset successfully. You can now log in with your new password.'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -80,13 +103,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(
-                    Icons.show_chart,
+                    Icons.lock_reset,
                     size: 80,
                     color: Colors.blue,
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'StockSense',
+                    'Reset Password',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -94,7 +117,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Create an account',
+                    'Enter your new password',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey,
@@ -102,21 +125,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 48),
                   TextField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'Enter your email',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
                     controller: _passwordController,
                     decoration: const InputDecoration(
-                      labelText: 'Password',
-                      hintText: 'Enter your password',
+                      labelText: 'New Password',
+                      hintText: 'Enter your new password',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
                     ),
@@ -127,7 +139,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(
                       labelText: 'Confirm Password',
-                      hintText: 'Confirm your password',
+                      hintText: 'Confirm your new password',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
                     ),
@@ -146,10 +158,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: isLoading ? null : _signup,
+                      onPressed: isLoading ? null : _resetPassword,
                       child: isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Sign Up'),
+                          : const Text('Reset Password'),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -157,7 +169,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     onPressed: () {
                       Navigator.pushReplacementNamed(context, '/login');
                     },
-                    child: const Text('Already have an account? Login'),
+                    child: const Text('Back to Login'),
                   ),
                 ],
               ),
@@ -170,7 +182,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();

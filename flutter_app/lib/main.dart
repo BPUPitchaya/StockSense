@@ -7,6 +7,7 @@ import 'screens/budget_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'screens/admin_login_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'services/api_service.dart';
@@ -48,6 +49,7 @@ class _StockzAppState extends State<StockzApp> {
         '/': (context) => const AuthChecker(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
+        '/reset-password': (context) => const ResetPasswordScreen(),
         '/home': (context) => const MainScreen(),
         '/admin-login': (context) => const AdminLoginScreen(),
         '/admin-dashboard': (context) => const AdminDashboardScreen(),
