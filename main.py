@@ -283,6 +283,14 @@ def delete_user(user_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/admin/cache/predictions/{user_id}")
+def clear_prediction_cache(user_id: int):
+    """Clear prediction cache for a specific user"""
+    keys_removed = [k for k in list(_cache.keys()) if f"predictions_{user_id}" in k]
+    for k in keys_removed:
+        del _cache[k]
+    return {"message": f"Cleared {len(keys_removed)} cache entries for user {user_id}"}
+
 @app.delete("/admin/users/{email}/watchlist")
 def clear_user_watchlist(email: str):
     """Clear all watchlist entries for a user by email (admin only)"""
