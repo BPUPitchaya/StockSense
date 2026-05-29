@@ -242,12 +242,12 @@ def signup(request: SignupRequest):
             # Create verification token
             token = database.create_verification_token(request.email, 'email_verification', 24)
             if token:
-                # Send verification email
-                email_sent = database.send_verification_email(request.email, token, 'email_verification')
-                if email_sent:
-                    return {"message": "User created successfully. Please check your email to verify your account."}
-                else:
-                    return {"message": "User created successfully. Email verification failed (SMTP not configured)."}
+                # Send verification email (non-blocking - won't fail signup if email fails)
+                try:
+                    database.send_verification_email(request.email, token, 'email_verification')
+                except Exception as e:
+                    print(f"Email sending failed (non-critical): {e}")
+                return {"message": "User created successfully. Please check your email to verify your account."}
             else:
                 return {"message": "User created successfully. Verification token generation failed."}
         else:
