@@ -858,26 +858,52 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         # Use yfinance for premarket data
         import yfinance as yf
         
+        print(f"Fetching premarket data for {ticker}...")
         stock = yf.Ticker(ticker)
-        info = stock.info
         
-        premarket_price = info.get('preMarketPrice')
-        previous_close = info.get('previousClose')
+        # Use fast_info first (much faster)
+        try:
+            fast_info = stock.fast_info
+            premarket_price = fast_info.last_price
+            previous_close = fast_info.previous_close
+            
+            if premarket_price and previous_close:
+                change = premarket_price - previous_close
+                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
+                
+                print(f"Premarket data for {ticker} (fast_info): ${premarket_price} ({percent_change:.2f}%)")
+                
+                return {
+                    'premarket_price': premarket_price,
+                    'premarket_change': change,
+                    'premarket_percent_change': percent_change,
+                    'is_premarket': True
+                }
+        except Exception as e:
+            print(f"fast_info failed for {ticker}: {e}")
         
-        if premarket_price and previous_close:
-            change = premarket_price - previous_close
-            percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
+        # Fallback to regular info with timeout
+        try:
+            info = stock.info
+            premarket_price = info.get('preMarketPrice')
+            previous_close = info.get('previousClose')
             
-            print(f"Premarket data for {ticker} (yfinance): ${premarket_price} ({percent_change:.2f}%)")
-            
-            return {
-                'premarket_price': premarket_price,
-                'premarket_change': change,
-                'premarket_percent_change': percent_change,
-                'is_premarket': True
-            }
-        else:
-            print(f"No premarket price for {ticker} - preMarketPrice: {premarket_price}, previousClose: {previous_close}")
+            if premarket_price and previous_close:
+                change = premarket_price - previous_close
+                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
+                
+                print(f"Premarket data for {ticker} (info): ${premarket_price} ({percent_change:.2f}%)")
+                
+                return {
+                    'premarket_price': premarket_price,
+                    'premarket_change': change,
+                    'premarket_percent_change': percent_change,
+                    'is_premarket': True
+                }
+            else:
+                print(f"No premarket price for {ticker} - preMarketPrice: {premarket_price}, previousClose: {previous_close}")
+        except Exception as e:
+            print(f"info failed for {ticker}: {e}")
         
         return {
             'is_premarket': True,
@@ -887,6 +913,8 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         }
     except Exception as e:
         print(f"Error fetching premarket data for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
