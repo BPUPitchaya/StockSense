@@ -489,7 +489,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                       ),
                       child: signal.premarketPrice != null
                           ? Text(
-                              'Pre-market: ${_formatPrice(signal.premarketPrice!)}',
+                              'Pre-market: ${_formatPrice(signal.premarketPrice!)}${signal.premarketPercentChange != null ? ' (${signal.premarketPercentChange! >= 0 ? '+' : ''}${signal.premarketPercentChange!.toStringAsFixed(2)}%)' : ''}',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.purple,
@@ -506,7 +506,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                             ),
                     ),
                   const SizedBox(width: 8),
-                  if (pc != null)
+                  if (pc != null && !signal.isPremarket)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
