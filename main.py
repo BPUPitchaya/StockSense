@@ -171,7 +171,7 @@ def get_cache_key(prefix: str, **kwargs) -> str:
         key_parts.append(f"{k}={v}")
     return ":".join(key_parts)
 
-def get_from_cache(key: str, allow_stale: bool = False) -> tuple[Optional[Any], bool]:
+def get_from_cache(key: str, allow_stale: bool = False, custom_duration: Optional[int] = None) -> tuple[Optional[Any], bool]:
     """
     Get data from cache.
     Returns: (data, is_fresh) - is_fresh is False if stale but usable
@@ -179,8 +179,9 @@ def get_from_cache(key: str, allow_stale: bool = False) -> tuple[Optional[Any], 
     if key in _cache:
         data, timestamp = _cache[key]
         age = time.time() - timestamp
+        duration = custom_duration if custom_duration is not None else CACHE_DURATION
         
-        if age < CACHE_DURATION:
+        if age < duration:
             return data, True  # Fresh
         elif allow_stale and age < STALE_DURATION:
             return data, False  # Stale but usable
@@ -347,12 +348,16 @@ def get_signals(category: Optional[str] = None):
     """Get trading signals - instant with stale-while-revalidate"""
     cache_key = get_cache_key("signals_5stocks", category=category or "all")
     
+    # Use shorter cache during premarket hours (1 minute vs 10 minutes)
+    is_premarket = signals.is_premarket_hours()
+    current_cache_duration = 60 if is_premarket else CACHE_DURATION
+    
     # Try to get from cache (allow stale for instant response)
-    cached_data, is_fresh = get_from_cache(cache_key, allow_stale=True)
+    cached_data, is_fresh = get_from_cache(cache_key, allow_stale=True, custom_duration=current_cache_duration)
     
     if cached_data:
         if is_fresh:
-            print(f"Returning {len(cached_data)} FRESH cached signals")
+            print(f"Returning {len(cached_data)} FRESH cached signals (premarket: {is_premarket})")
             return cached_data
         else:
             # Stale data - return immediately, refresh in background
@@ -366,7 +371,7 @@ def get_signals(category: Optional[str] = None):
         try:
             all_signals_data = signals.get_all_signals()
             if all_signals_data:
-                print(f"Generated {len(all_signals_data)} signals (cold start)")
+                print(f"Generated {len(all_signals_data)} signals (cold start, premarket: {is_premarket})")
                 clean_data = clean_for_json(all_signals_data)
                 set_cache(cache_key, clean_data)
                 return clean_data

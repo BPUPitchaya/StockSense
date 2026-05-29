@@ -780,7 +780,9 @@ def is_premarket_hours() -> bool:
         et = pytz.timezone('US/Eastern')
         now = datetime.now(et)
         current_time = now.time()
-        return current_time.hour >= 4 and (current_time.hour < 9 or (current_time.hour == 9 and current_time.minute < 30))
+        is_premarket = current_time.hour >= 4 and (current_time.hour < 9 or (current_time.hour == 9 and current_time.minute < 30))
+        print(f"Current ET time: {now.strftime('%H:%M')}, Is premarket: {is_premarket}")
+        return is_premarket
     except Exception as e:
         print(f"Error checking premarket hours: {e}")
         return False
