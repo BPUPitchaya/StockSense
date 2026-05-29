@@ -758,14 +758,26 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
         html_part = MIMEText(body, 'html')
         msg.attach(html_part)
         
-        # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
+        # Send email with timeout
+        print(f"Attempting to send email to {email} via {smtp_server}:{smtp_port}")
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            print("SMTP connection established")
             server.starttls()
+            print("TLS started")
             server.login(smtp_username, smtp_password)
+            print("Login successful")
             server.send_message(msg)
-        
-        print(f"Email sent to {email}")
+            print(f"Email sent to {email}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"SMTP authentication error: {e}")
+        return False
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP connection error: {e}")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"SMTP error: {e}")
+        return False
     except Exception as e:
         print(f"Error sending email: {e}")
         return False
