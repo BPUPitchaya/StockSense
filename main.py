@@ -210,6 +210,23 @@ def startup_event():
     """Initialize database only - cache warms on first request"""
     database.init_db()
     print("Database initialized, ready for requests")
+    
+    # Check and update prediction accuracy for due predictions
+    try:
+        due_predictions = database.get_predictions_due_for_check()
+        if due_predictions:
+            print(f"Checking accuracy for {len(due_predictions)} due predictions...")
+            for pred in due_predictions:
+                try:
+                    ticker = pred['ticker']
+                    stock_info = signals.get_stock_info_finnhub(ticker)
+                    if stock_info and stock_info.get('current_price'):
+                        database.update_prediction_accuracy(pred['id'], stock_info['current_price'])
+                        print(f"  Updated accuracy for {ticker}: ${stock_info['current_price']}")
+                except Exception as e:
+                    print(f"  Error checking {pred.get('ticker')}: {e}")
+    except Exception as e:
+        print(f"Error checking prediction accuracy: {e}")
 
 @app.get("/")
 def read_root():
@@ -408,6 +425,17 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
                     sorted_signals = sorted(clean_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
                     all_predictions = convert_signals_to_predictions(sorted_signals)
                     
+                    # Save predictions for accuracy tracking
+                    for pred in all_predictions:
+                        signal_upper = pred.get('signal', '').upper()
+                        direction = 'up' if 'BUY' in signal_upper else 'down' if 'SELL' in signal_upper else 'flat'
+                        database.save_prediction(
+                            ticker=pred['ticker'],
+                            signal=pred['signal'],
+                            current_price=pred['current_price'],
+                            predicted_direction=direction
+                        )
+                    
                     predictions = {
                         'gainers': all_predictions[:3],
                         'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
@@ -422,6 +450,32 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         
         # All retries failed
         raise HTTPException(status_code=503, detail="Prediction service temporarily unavailable. Please try again.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predictions/history/{ticker}")
+def get_prediction_history_endpoint(ticker: str):
+    """Get historical predictions for a ticker to show accuracy"""
+    try:
+        history = database.get_prediction_history(ticker)
+        return {"ticker": ticker, "predictions": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/predictions/save")
+def save_prediction_endpoint(request: dict):
+    """Save a prediction for accuracy tracking"""
+    try:
+        ticker = request.get('ticker')
+        signal = request.get('signal')
+        current_price = request.get('current_price')
+        predicted_direction = request.get('predicted_direction', 'flat')
+        
+        if not all([ticker, signal, current_price]):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        prediction_id = database.save_prediction(ticker, signal, current_price, predicted_direction)
+        return {"success": True, "prediction_id": prediction_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

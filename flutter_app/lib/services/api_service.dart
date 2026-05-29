@@ -278,6 +278,16 @@ class ApiService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getPredictionHistory(String ticker) async {
+    final response = await http.get(Uri.parse('$baseUrl/predictions/history/$ticker'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data['predictions'] ?? []);
+    } else {
+      return [];
+    }
+  }
+
   static Future<void> updatePosition(int positionId, Map<String, dynamic> position) async {
     final headers = await _getHeaders();
     final response = await http.put(

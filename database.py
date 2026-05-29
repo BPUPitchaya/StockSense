@@ -1,9 +1,9 @@
 import os
 from typing import List, Dict, Optional
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 
 # Get database URL from environment variable, default to SQLite for local development
@@ -45,6 +45,19 @@ class Budget(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     amount = Column(Float, default=0.0)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+class PredictionHistory(Base):
+    __tablename__ = 'prediction_history'
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, nullable=False, index=True)
+    signal = Column(String, nullable=False)  # BUY, SELL, HOLD
+    current_price = Column(Float, nullable=False)  # Price when prediction made
+    predicted_direction = Column(String, nullable=False)  # up, down, flat
+    prediction_date = Column(DateTime, default=datetime.utcnow)
+    target_date = Column(DateTime, nullable=False)  # 30 days forward
+    actual_price = Column(Float, nullable=True)  # Filled in later
+    accuracy_percent = Column(Float, nullable=True)  # Calculated when target_date reached
+    is_correct = Column(Boolean, nullable=True)  # True if direction matched
 
 def init_db():
     """Initialize the database"""
@@ -450,5 +463,105 @@ def set_user_currency(user_id: int, currency: str) -> bool:
         print(f"Error setting user currency: {e}")
         session.rollback()
         return False
+    finally:
+        session.close()
+
+def save_prediction(ticker: str, signal: str, current_price: float, predicted_direction: str, days_forward: int = 30) -> int:
+    """Save a prediction to track accuracy later"""
+    session = SessionLocal()
+    try:
+        prediction = PredictionHistory(
+            ticker=ticker,
+            signal=signal,
+            current_price=current_price,
+            predicted_direction=predicted_direction,
+            prediction_date=datetime.utcnow(),
+            target_date=datetime.utcnow() + timedelta(days=days_forward)
+        )
+        session.add(prediction)
+        session.commit()
+        return prediction.id
+    except Exception as e:
+        print(f"Error saving prediction: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+def get_prediction_history(ticker: str, limit: int = 50) -> List[Dict]:
+    """Get prediction history for a ticker"""
+    session = SessionLocal()
+    try:
+        predictions = session.query(PredictionHistory).filter(
+            PredictionHistory.ticker == ticker
+        ).order_by(PredictionHistory.prediction_date.desc()).limit(limit).all()
+        
+        return [{
+            'id': p.id,
+            'ticker': p.ticker,
+            'signal': p.signal,
+            'current_price': p.current_price,
+            'predicted_direction': p.predicted_direction,
+            'prediction_date': p.prediction_date.isoformat() if p.prediction_date else None,
+            'target_date': p.target_date.isoformat() if p.target_date else None,
+            'actual_price': p.actual_price,
+            'accuracy_percent': p.accuracy_percent,
+            'is_correct': p.is_correct
+        } for p in predictions]
+    except Exception as e:
+        print(f"Error getting prediction history: {e}")
+        return []
+    finally:
+        session.close()
+
+def update_prediction_accuracy(prediction_id: int, actual_price: float) -> bool:
+    """Update a prediction with actual price and calculate accuracy"""
+    session = SessionLocal()
+    try:
+        prediction = session.query(PredictionHistory).filter(PredictionHistory.id == prediction_id).first()
+        if not prediction:
+            return False
+        
+        prediction.actual_price = actual_price
+        
+        # Calculate if direction was correct
+        price_change = actual_price - prediction.current_price
+        actual_direction = 'up' if price_change > 0.01 else 'down' if price_change < -0.01 else 'flat'
+        prediction.is_correct = (actual_direction == prediction.predicted_direction)
+        
+        # Calculate accuracy percentage (0-100% based on how close the magnitude was)
+        if prediction.current_price > 0:
+            predicted_change = 0.002 * 30 if prediction.predicted_direction == 'up' else -0.002 * 30 if prediction.predicted_direction == 'down' else 0
+            predicted_price = prediction.current_price * (1 + predicted_change)
+            if predicted_price > 0:
+                error_ratio = abs(actual_price - predicted_price) / predicted_price
+                prediction.accuracy_percent = max(0, 100 - (error_ratio * 100))
+        
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating prediction accuracy: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_predictions_due_for_check() -> List[Dict]:
+    """Get predictions that have reached their target date but don't have actual prices"""
+    session = SessionLocal()
+    try:
+        predictions = session.query(PredictionHistory).filter(
+            PredictionHistory.target_date <= datetime.utcnow(),
+            PredictionHistory.actual_price.is_(None)
+        ).all()
+        
+        return [{
+            'id': p.id,
+            'ticker': p.ticker,
+            'target_date': p.target_date.isoformat() if p.target_date else None
+        } for p in predictions]
+    except Exception as e:
+        print(f"Error getting due predictions: {e}")
+        return []
     finally:
         session.close()

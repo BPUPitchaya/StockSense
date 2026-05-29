@@ -32,6 +32,15 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   DateTime? _buyDate;
   bool _useTotalAmount = false;
 
+  // Chart line visibility toggles
+  bool _showPrice = true;
+  bool _showMA50 = true;
+  bool _showMA200 = true;
+  bool _showPrediction = true;
+  
+  // Historical predictions for accuracy tracking
+  List<Map<String, dynamic>> _predictionHistory = [];
+
   /// Currency symbols for native formatting
   static const _currencySymbols = {
     'USD': '\$', 'AUD': 'A\$', 'NZD': 'NZ\$', 'GBP': '£',
@@ -79,12 +88,14 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       final results = await Future.wait([
         ApiService.getStockHistory(widget.signal.ticker, '1y'),
         ApiService.getStockInfo(widget.signal.ticker),
+        ApiService.getPredictionHistory(widget.signal.ticker),
       ]);
       
       if (mounted) {
         setState(() {
           historicalData = results[0] as List<HistoricalData>;
           stockInfo = results[1] as Map<String, dynamic>;
+          _predictionHistory = results[2] as List<Map<String, dynamic>>;
           isLoading = false;
         });
       }
@@ -528,20 +539,38 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final hasMA50 = ma50Spots.isNotEmpty;
     final hasMA200 = ma200Spots.isNotEmpty;
 
+    // Calculate future projection based on signal (30 days forward)
+    final projectionSpots = <FlSpot>[];
+    if (historicalData.isNotEmpty) {
+      final lastPrice = historicalData.last.close;
+      final lastIndex = historicalData.length - 1;
+      // Determine trend based on signal
+      final signalUpper = widget.signal.signal.toUpperCase();
+      final trend = signalUpper.contains('BUY') ? 0.002 : signalUpper.contains('SELL') ? -0.002 : 0.0;
+      // Daily volatility approximation
+      final volatility = (rawMax - rawMin) / prices.length;
+      for (int i = 1; i <= 30; i++) {
+        final projectedPrice = lastPrice * (1 + (trend * i)) + (volatility * 0.1 * i);
+        projectionSpots.add(FlSpot((lastIndex + i).toDouble(), projectedPrice));
+      }
+    }
+    final hasProjection = projectionSpots.isNotEmpty;
+
     final List<LineChartBarData> lines = [
-      LineChartBarData(
-        spots: historicalData.asMap().entries.map((e) =>
-            FlSpot(e.key.toDouble(), e.value.close)).toList(),
-        isCurved: true,
-        color: Colors.blue,
-        barWidth: 2,
-        dotData: FlDotData(show: false),
-        belowBarData: BarAreaData(
-          show: true,
-          color: Colors.blue.withOpacity(0.08),
+      if (_showPrice)
+        LineChartBarData(
+          spots: historicalData.asMap().entries.map((e) =>
+              FlSpot(e.key.toDouble(), e.value.close)).toList(),
+          isCurved: true,
+          color: Colors.blue,
+          barWidth: 2,
+          dotData: FlDotData(show: false),
+          belowBarData: BarAreaData(
+            show: true,
+            color: Colors.blue.withOpacity(0.08),
+          ),
         ),
-      ),
-      if (hasMA50)
+      if (hasMA50 && _showMA50)
         LineChartBarData(
           spots: ma50Spots,
           isCurved: true,
@@ -550,7 +579,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           dotData: FlDotData(show: false),
           dashArray: [6, 4],
         ),
-      if (hasMA200)
+      if (hasMA200 && _showMA200)
         LineChartBarData(
           spots: ma200Spots,
           isCurved: true,
@@ -559,6 +588,18 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           dotData: FlDotData(show: false),
           dashArray: [6, 4],
         ),
+      if (hasProjection && _showPrediction)
+        LineChartBarData(
+          spots: projectionSpots,
+          isCurved: true,
+          color: Colors.purple,
+          barWidth: 2,
+          dotData: FlDotData(show: true, checkToShowDot: (spot, barData) => spot.x == projectionSpots.last.x),
+          dashArray: [4, 4],
+        ),
+      // Historical prediction accuracy dots
+      if (_predictionHistory.isNotEmpty && historicalData.isNotEmpty)
+        ..._buildHistoricalPredictionDots(historicalData),
     ];
 
     return Card(
@@ -569,24 +610,41 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: const Text(
-                'Price Chart (1 Year)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              child: Row(
+                children: [
+                  const Text(
+                    'Price Chart (1 Year)',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'AI Forecast',
+                      style: TextStyle(fontSize: 10, color: Colors.purple, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
               ),
             ),
-            // Legend
-            if (hasMA50 || hasMA200)
-              Padding(
-                padding: const EdgeInsets.only(left: 8, top: 8),
-                child: Wrap(
-                  spacing: 16,
-                  children: [
-                    _buildLegendItem(Colors.blue, 'Price'),
-                    if (hasMA50) _buildLegendItem(Colors.orange, 'MA200'),
-                    if (hasMA200) _buildLegendItem(Colors.red, 'MA50'),
-                  ],
-                ),
+            // Legend with toggleable items
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 8),
+              child: Wrap(
+                spacing: 16,
+                children: [
+                  _buildLegendItem(Colors.blue, 'Price', _showPrice, () => setState(() => _showPrice = !_showPrice)),
+                  if (hasMA50) _buildLegendItem(Colors.orange, 'MA50', _showMA50, () => setState(() => _showMA50 = !_showMA50)),
+                  if (hasMA200) _buildLegendItem(Colors.red, 'MA200', _showMA200, () => setState(() => _showMA200 = !_showMA200)),
+                  if (hasProjection) _buildLegendItem(Colors.purple, 'AI Forecast', _showPrediction, () => setState(() => _showPrediction = !_showPrediction)),
+                  if (_predictionHistory.isNotEmpty) _buildAccuracyLegend(),
+                ],
               ),
+            ),
             const SizedBox(height: 12),
             SizedBox(
               height: 260,
@@ -666,15 +724,97 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     );
   }
 
-  Widget _buildLegendItem(Color color, String label) {
+  Widget _buildLegendItem(Color color, String label, bool isVisible, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 2,
+            color: isVisible ? color : Colors.grey.shade400,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isVisible ? Colors.grey.shade700 : Colors.grey.shade400,
+              fontWeight: isVisible ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccuracyLegend() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 16, height: 2, color: color),
+        Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        const Text('Past Predictions', style: TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
+  }
+
+  List<LineChartBarData> _buildHistoricalPredictionDots(List<HistoricalData> historicalData) {
+    final dots = <LineChartBarData>[];
+    
+    for (final pred in _predictionHistory) {
+      try {
+        final predDate = DateTime.parse(pred['prediction_date'] ?? '');
+        final actualPrice = pred['actual_price'] as double?;
+        final isCorrect = pred['is_correct'] as bool?;
+        final currentPrice = pred['current_price'] as double?;
+        
+        // Find index in historical data closest to prediction date
+        int closestIndex = -1;
+        double minDiff = double.infinity;
+        for (int i = 0; i < historicalData.length; i++) {
+          final dataDate = DateTime.parse(historicalData[i].date);
+          final diff = (dataDate.difference(predDate).inDays).abs();
+          if (diff < minDiff) {
+            minDiff = diff.toDouble();
+            closestIndex = i;
+          }
+        }
+        
+        if (closestIndex >= 0 && closestIndex < historicalData.length) {
+          // Dot color: green = correct prediction, red = wrong, grey = not checked yet
+          Color dotColor = Colors.grey;
+          if (isCorrect == true) dotColor = Colors.green;
+          else if (isCorrect == false) dotColor = Colors.red;
+          
+          dots.add(LineChartBarData(
+            spots: [FlSpot(closestIndex.toDouble(), historicalData[closestIndex].close)],
+            isCurved: false,
+            color: dotColor,
+            barWidth: 0,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                radius: 6,
+                color: dotColor,
+                strokeWidth: 2,
+                strokeColor: Colors.white,
+              ),
+            ),
+          ));
+        }
+      } catch (e) {
+        // Skip invalid predictions
+      }
+    }
+    
+    return dots;
   }
 
   Widget _buildDetailsSection() {
