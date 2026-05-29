@@ -657,7 +657,7 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
                 'pe_ratio': to_native(stock_info.get('pe_ratio')),
                 'beta': to_native(stock_info.get('beta')),
                 'eps': to_native(stock_info.get('eps')),
-                'is_premarket': to_native(stock_info.get('is_premarket')),
+                'is_premarket': to_native(is_premarket_hours()),
                 'premarket_price': to_native(stock_info.get('premarket_price')),
                 'premarket_change': to_native(stock_info.get('premarket_change')),
                 'premarket_percent_change': to_native(stock_info.get('premarket_percent_change')),
