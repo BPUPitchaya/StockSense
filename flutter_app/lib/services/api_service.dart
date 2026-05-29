@@ -264,8 +264,17 @@ class ApiService {
     final response = await http.get(Uri.parse('$baseUrl/predictions'), headers: headers);
     if (response.statusCode == 200) {
       return json.decode(response.body);
+    } else if (response.statusCode == 503) {
+      throw Exception('Prediction service is temporarily unavailable. Please try again in a moment.');
+    } else if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Session expired. Please log in again.');
     } else {
-      throw Exception('Failed to get predictions: ${response.body}');
+      try {
+        final body = json.decode(response.body);
+        final detail = body['detail'];
+        if (detail is String) throw Exception(detail);
+      } catch (_) {}
+      throw Exception('Could not load predictions. Please try again.');
     }
   }
 

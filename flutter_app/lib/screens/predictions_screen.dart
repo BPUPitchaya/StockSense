@@ -47,7 +47,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          error = e.toString();
+          error = e.toString().replaceFirst('Exception: ', '');
           isLoading = false;
         });
       }
@@ -89,19 +89,19 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       // Validate stock before adding
       final validation = await ApiService.validateStock(ticker);
       
-      if (!validation['valid']) {
+      if (validation['is_etf'] == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Cannot add $ticker: ${validation['reason']}')),
+            SnackBar(content: Text('"$ticker" is an ETF and is not supported for predictions.')),
           );
         }
         return;
       }
-      
-      if (validation['is_etf']) {
+
+      if (!validation['valid']) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ETFs are not supported for predictions')),
+            SnackBar(content: Text('"$ticker" is not a valid stock ticker. Please check and try again.')),
           );
         }
         return;
@@ -113,7 +113,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add $ticker: ${e.toString()}')),
+          SnackBar(content: Text('Could not add $ticker. Please check the ticker and try again.')),
         );
       }
     }
@@ -127,7 +127,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove $ticker: ${e.toString()}')),
+          SnackBar(content: Text('Could not remove $ticker. Please try again.')),
         );
       }
     }
@@ -180,18 +180,29 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Error: $error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadPredictions,
-                          child: const Text('Retry'),
+                ? ListView(
+                    children: [
+                      // Still show watchlist so user can remove bad tickers
+                      _buildPersonalWatchlistSection(),
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 40, color: Colors.orange),
+                            const SizedBox(height: 12),
+                            const Text('Could not load predictions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
+                            const Text('A ticker in your watchlist may be invalid.\nRemove it above and retry.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.5)),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: _loadPredictions,
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   )
                 : RefreshIndicator(
                     onRefresh: _loadPredictions,

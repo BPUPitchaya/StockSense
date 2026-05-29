@@ -582,8 +582,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   spacing: 16,
                   children: [
                     _buildLegendItem(Colors.blue, 'Price'),
-                    if (hasMA50) _buildLegendItem(Colors.orange, 'MA50'),
-                    if (hasMA200) _buildLegendItem(Colors.red, 'MA200'),
+                    if (hasMA50) _buildLegendItem(Colors.orange, 'MA200'),
+                    if (hasMA200) _buildLegendItem(Colors.red, 'MA50'),
                   ],
                 ),
               ),

@@ -83,13 +83,15 @@ class _SignalsScreenState extends State<SignalsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          error = e.toString();
           isSearching = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"$ticker" not found. Check the ticker and try again.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
     }
   }
 

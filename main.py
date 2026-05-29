@@ -283,6 +283,15 @@ def delete_user(user_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/admin/users/{email}/watchlist")
+def clear_user_watchlist(email: str):
+    """Clear all watchlist entries for a user by email (admin only)"""
+    try:
+        result = database.clear_watchlist_by_email(email)
+        return {"message": f"Cleared watchlist for {email}", "removed": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/admin/statistics")
 def get_admin_statistics():
     """Get admin dashboard statistics"""

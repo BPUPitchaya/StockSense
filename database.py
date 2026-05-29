@@ -362,6 +362,19 @@ def get_personal_watchlist(user_id: int = None) -> List[str]:
     finally:
         session.close()
 
+def clear_watchlist_by_email(email: str) -> int:
+    """Clear all watchlist entries for a user by email"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.email == email).first()
+        if not user:
+            raise ValueError(f"User {email} not found")
+        deleted = session.query(PersonalWatchlist).filter(PersonalWatchlist.user_id == user.id).delete()
+        session.commit()
+        return deleted
+    finally:
+        session.close()
+
 def remove_from_watchlist(ticker: str, user_id: int = None) -> bool:
     """Remove a stock from the personal watchlist"""
     session = SessionLocal()

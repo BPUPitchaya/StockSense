@@ -42,7 +42,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       });
     } catch (e) {
       setState(() {
-        error = e.toString();
+        error = 'Unable to load portfolio. Please try again.';
         isLoading = false;
       });
     }
@@ -54,7 +54,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       _loadPortfolio();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete position: $e')),
+        const SnackBar(content: Text('Could not delete position. Please try again.')),
       );
     }
   }
@@ -115,7 +115,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 }
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to update position: $e')),
+                  const SnackBar(content: Text('Could not update position. Check your inputs and try again.')),
                 );
               }
             },
@@ -169,9 +169,35 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final ticker = tickerController.text.trim().toUpperCase();
+              if (ticker.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a ticker symbol.')),
+                );
+                return;
+              }
+              if (double.tryParse(buyPriceController.text) == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid buy price.')),
+                );
+                return;
+              }
+              if (double.tryParse(quantityController.text) == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid quantity.')),
+                );
+                return;
+              }
               try {
+                final validation = await ApiService.validateStock(ticker);
+                if (!validation['valid']) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('"$ticker" is not a valid stock ticker. Please check and try again.')),
+                  );
+                  return;
+                }
                 final position = Position(
-                  ticker: tickerController.text.toUpperCase(),
+                  ticker: ticker,
                   buyPrice: double.parse(buyPriceController.text),
                   quantity: double.parse(quantityController.text),
                   date: dateController.text,
@@ -181,7 +207,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                 _loadPortfolio();
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to add position: $e')),
+                  const SnackBar(content: Text('Could not add position. Please check the ticker and try again.')),
                 );
               }
             },
@@ -212,11 +238,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Error: $error'),
+                        const Icon(Icons.error_outline, size: 48, color: Colors.grey),
                         const SizedBox(height: 16),
-                        ElevatedButton(
+                        Text(error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.refresh, size: 16),
                           onPressed: _loadPortfolio,
-                          child: const Text('Retry'),
+                          label: const Text('Retry'),
                         ),
                       ],
                     ),
