@@ -98,9 +98,22 @@ def init_db():
         columns = [col['name'] for col in inspector.get_columns('users')]
         if 'preferred_currency' not in columns:
             with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_currency VARCHAR(3) DEFAULT 'USD'"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_currency VARCHAR DEFAULT 'USD'"))
                 conn.commit()
             print("preferred_currency column added to users")
+        
+        # Add is_verified column to users if it doesn't exist
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'is_verified' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+            print("is_verified column added to users")
+        
+        # Create verification_tokens table if it doesn't exist
+        if 'verification_tokens' not in inspector.get_table_names():
+            VerificationToken.__table__.create(bind=engine)
+            print("verification_tokens table created")
         
         # Ensure default stocks are in personal watchlist
         session = SessionLocal()
