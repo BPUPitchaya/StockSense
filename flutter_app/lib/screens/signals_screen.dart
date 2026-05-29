@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:io';
 import '../models/signal.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
@@ -121,6 +122,24 @@ class _SignalsScreenState extends State<SignalsScreen> {
   void _showMarketHoursDialog() {
     if (marketStatus == null) return;
     
+    // Parse UTC times and convert to local timezone
+    final now = DateTime.now();
+    final localOffset = now.timeZoneOffset;
+    final localOffsetHours = localOffset.inHours;
+    final localOffsetSign = localOffsetHours >= 0 ? '+' : '';
+    
+    // Parse market open/close UTC times
+    final openUtcParts = marketStatus!['market_open_utc'].split(':');
+    final closeUtcParts = marketStatus!['market_close_utc'].split(':');
+    final openUtcHour = int.parse(openUtcParts[0]);
+    final closeUtcHour = int.parse(closeUtcParts[0]);
+    
+    // Convert to local time
+    final openLocalHour = (openUtcHour + localOffsetHours) % 24;
+    final closeLocalHour = (closeUtcHour + localOffsetHours) % 24;
+    final openLocalTime = '${openLocalHour.toString().padLeft(2, '0')}:${openUtcParts[1]}';
+    final closeLocalTime = '${closeLocalHour.toString().padLeft(2, '0')}:${closeUtcParts[1]}';
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -151,13 +170,13 @@ class _SignalsScreenState extends State<SignalsScreen> {
             Text('Open: ${marketStatus!['market_open_et']}'),
             Text('Close: ${marketStatus!['market_close_et']}'),
             const SizedBox(height: 12),
-            const Text('Regular Hours (UTC):'),
+            Text('Regular Hours (Your Time - UTC$localOffsetSign$localOffsetHours):'),
             const SizedBox(height: 4),
-            Text('Open: ${marketStatus!['market_open_utc']} UTC'),
-            Text('Close: ${marketStatus!['market_close_utc']} UTC'),
+            Text('Open: $openLocalTime'),
+            Text('Close: $closeLocalTime'),
             const SizedBox(height: 12),
             Text('Current Time (ET): ${marketStatus!['current_time_et']}'),
-            Text('Current Time (UTC): ${marketStatus!['current_time_utc']} UTC'),
+            Text('Current Time (Your Time): ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}'),
           ],
         ),
         actions: [
