@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+venv/
 
 # IntelliJ related
 *.iml
@@ -32,6 +33,7 @@ migrate_working_dir/
 .pub/
 /build/
 !/build/web/
+/build/web/venv/
 /coverage/
 
 # Symbolication related
