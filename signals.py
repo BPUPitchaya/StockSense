@@ -846,7 +846,7 @@ def get_market_hours() -> Dict:
 
 
 def get_premarket_data(ticker: str) -> Optional[Dict]:
-    """Get premarket data from Yahoo Finance"""
+    """Get premarket data from yfinance"""
     try:
         et = pytz.timezone('US/Eastern')
         now = datetime.now(et)
@@ -855,42 +855,29 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         if not is_premarket_hours():
             return None
         
-        # Use Yahoo Finance API for premarket data
-        import requests
+        # Use yfinance for premarket data
+        import yfinance as yf
         
-        url = f'https://query1.finance.yahoo.com/v7/finance/options/{ticker}'
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-        }
+        stock = yf.Ticker(ticker)
+        info = stock.info
         
-        response = requests.get(url, headers=headers, timeout=5)
+        premarket_price = info.get('preMarketPrice')
+        previous_close = info.get('previousClose')
         
-        if response.status_code == 200:
-            data = response.json()
-            result = data['optionChain']['result'][0]['quote']
+        if premarket_price and previous_close:
+            change = premarket_price - previous_close
+            percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
             
-            premarket_price = result.get('preMarketPrice')
-            premarket_change_percent = result.get('preMarketChangePercent')
-            market_state = result.get('marketState')
-            previous_close = result.get('regularMarketPreviousClose')
+            print(f"Premarket data for {ticker} (yfinance): ${premarket_price} ({percent_change:.2f}%)")
             
-            if premarket_price and previous_close:
-                change = premarket_price - previous_close
-                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
-                
-                print(f"Premarket data for {ticker} (Yahoo): ${premarket_price} ({percent_change:.2f}%) - State: {market_state}")
-                
-                return {
-                    'premarket_price': premarket_price,
-                    'premarket_change': change,
-                    'premarket_percent_change': percent_change,
-                    'is_premarket': True,
-                    'market_state': market_state
-                }
-            else:
-                print(f"No premarket price for {ticker} - State: {market_state}")
+            return {
+                'premarket_price': premarket_price,
+                'premarket_change': change,
+                'premarket_percent_change': percent_change,
+                'is_premarket': True
+            }
         else:
-            print(f"Yahoo Finance API failed for {ticker}: {response.status_code}")
+            print(f"No premarket price for {ticker}")
         
         # Fallback: just return premarket flag without price data
         return {
