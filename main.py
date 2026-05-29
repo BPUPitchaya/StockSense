@@ -479,6 +479,15 @@ def save_prediction_endpoint(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/market/status")
+def get_market_status_endpoint():
+    """Get current US market status and hours"""
+    try:
+        market_status = signals.get_market_hours()
+        return market_status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/info/{ticker}")
 def get_stock_info_endpoint(ticker: str):
     """Get stock info including technical indicators (MA50, MA200, volume)."""

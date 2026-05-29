@@ -288,6 +288,19 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getMarketStatus() async {
+    final response = await http.get(Uri.parse('$baseUrl/market/status'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      return {
+        'is_open': false,
+        'is_premarket': false,
+        'error': 'Failed to fetch market status'
+      };
+    }
+  }
+
   static Future<void> updatePosition(int positionId, Map<String, dynamic> position) async {
     final headers = await _getHeaders();
     final response = await http.put(

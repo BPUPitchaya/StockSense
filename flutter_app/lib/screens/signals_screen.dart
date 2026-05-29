@@ -23,11 +23,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
   bool isSearching = false;
   List<String> personalWatchlist = [];
   Map<String, bool> inWatchlist = {};
+  Map<String, dynamic>? marketStatus;
+  
   @override
   void initState() {
     super.initState();
     _loadAll();
     _loadPersonalWatchlist();
+    _loadMarketStatus();
   }
 
   Future<void> _loadAll() async {
@@ -100,6 +103,71 @@ class _SignalsScreenState extends State<SignalsScreen> {
     setState(() {
       searchedSignal = null;
     });
+  }
+
+  Future<void> _loadMarketStatus() async {
+    try {
+      final status = await ApiService.getMarketStatus();
+      if (mounted) {
+        setState(() {
+          marketStatus = status;
+        });
+      }
+    } catch (e) {
+      // Silently fail - market status is optional
+    }
+  }
+
+  void _showMarketHoursDialog() {
+    if (marketStatus == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              marketStatus!['is_open'] ? Icons.wb_sunny : Icons.nights_stay,
+              color: marketStatus!['is_open'] ? Colors.orange : Colors.blue,
+            ),
+            const SizedBox(width: 8),
+            const Text('US Market Hours'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Status: ${marketStatus!['is_open'] ? 'Open' : marketStatus!['is_premarket'] ? 'Pre-market' : 'Closed'}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: marketStatus!['is_open'] ? Colors.green : Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Regular Hours (ET):'),
+            const SizedBox(height: 4),
+            Text('Open: ${marketStatus!['market_open_et']}'),
+            Text('Close: ${marketStatus!['market_close_et']}'),
+            const SizedBox(height: 12),
+            const Text('Regular Hours (UTC):'),
+            const SizedBox(height: 4),
+            Text('Open: ${marketStatus!['market_open_utc']} UTC'),
+            Text('Close: ${marketStatus!['market_close_utc']} UTC'),
+            const SizedBox(height: 12),
+            Text('Current Time (ET): ${marketStatus!['current_time_et']}'),
+            Text('Current Time (UTC): ${marketStatus!['current_time_utc']} UTC'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadPersonalWatchlist() async {
@@ -214,6 +282,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
               )
             : null,
         actions: [
+          IconButton(
+            icon: Icon(
+              marketStatus != null && marketStatus!['is_open'] ? Icons.wb_sunny : Icons.nights_stay,
+              color: marketStatus != null && marketStatus!['is_open'] ? Colors.orange : Colors.blue,
+            ),
+            onPressed: _showMarketHoursDialog,
+            tooltip: 'Market Hours',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadSignals,
@@ -384,6 +460,24 @@ class _SignalsScreenState extends State<SignalsScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
+                  if (signal.isPremarket && signal.premarketPrice != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        'Pre-market',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.purple,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
                   if (pc != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),

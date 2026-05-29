@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
@@ -12,6 +12,7 @@ from io import StringIO
 import finnhub
 import redis
 import requests
+import pytz
 
 # Core 5 stocks for fast loading
 CATEGORIES = {
@@ -752,6 +753,11 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             if ticker in ETF_NAMES:
                 result['name'] = ETF_NAMES[ticker]
         
+        # Add premarket data if available
+        premarket_data = get_premarket_data(ticker)
+        if premarket_data:
+            result.update(premarket_data)
+        
         # Cache result in Redis (15 min TTL)
         if redis_client:
             try:
@@ -761,6 +767,125 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
         return result
     except Exception as e:
         print(f"Error fetching Finnhub info for {ticker}: {e}")
+        return None
+
+
+def is_premarket_hours() -> bool:
+    """Check if current time is in premarket hours (4:00 AM - 9:30 AM ET)"""
+    try:
+        et = pytz.timezone('US/Eastern')
+        now = datetime.now(et)
+        current_time = now.time()
+        return current_time.hour >= 4 and (current_time.hour < 9 or (current_time.hour == 9 and current_time.minute < 30))
+    except Exception as e:
+        print(f"Error checking premarket hours: {e}")
+        return False
+
+
+def is_market_open() -> bool:
+    """Check if US market is currently open (9:30 AM - 4:00 PM ET, excluding weekends)"""
+    try:
+        et = pytz.timezone('US/Eastern')
+        now = datetime.now(et)
+        
+        # Check if it's a weekend
+        if now.weekday() >= 5:  # Saturday (5) or Sunday (6)
+            return False
+        
+        current_time = now.time()
+        # Market hours: 9:30 AM - 4:00 PM ET
+        market_open = current_time.hour == 9 and current_time.minute >= 30
+        market_midday = current_time.hour > 9 and current_time.hour < 16
+        market_close = current_time.hour == 16 and current_time.minute == 0
+        
+        return market_open or market_midday or market_close
+    except Exception as e:
+        print(f"Error checking market status: {e}")
+        return False
+
+
+def get_market_hours() -> Dict:
+    """Get US market hours in UTC for frontend display"""
+    try:
+        et = pytz.timezone('US/Eastern')
+        now = datetime.now(et)
+        
+        # Market hours in ET
+        market_open_et = "9:30 AM"
+        market_close_et = "4:00 PM"
+        
+        # Convert to UTC
+        utc = pytz.UTC
+        market_open_utc = et.localize(datetime(now.year, now.month, now.day, 9, 30)).astimezone(utc)
+        market_close_utc = et.localize(datetime(now.year, now.month, now.day, 16, 0)).astimezone(utc)
+        
+        return {
+            'is_open': is_market_open(),
+            'is_premarket': is_premarket_hours(),
+            'market_open_et': market_open_et,
+            'market_close_et': market_close_et,
+            'market_open_utc': market_open_utc.strftime('%H:%M'),
+            'market_close_utc': market_close_utc.strftime('%H:%M'),
+            'timezone': 'US/Eastern',
+            'current_time_et': now.strftime('%I:%M %p'),
+            'current_time_utc': datetime.now(utc).strftime('%H:%M'),
+        }
+    except Exception as e:
+        print(f"Error getting market hours: {e}")
+        return {
+            'is_open': False,
+            'is_premarket': False,
+            'error': str(e)
+        }
+
+
+def get_premarket_data(ticker: str) -> Optional[Dict]:
+    """Get premarket data from Finnhub"""
+    try:
+        et = pytz.timezone('US/Eastern')
+        now = datetime.now(et)
+        
+        # Only fetch during premarket hours (4:00 AM - 9:30 AM ET)
+        if not is_premarket_hours():
+            return None
+        
+        # Get candles for premarket period (resolution: 1 minute)
+        # We'll get the last 30 minutes of premarket data
+        to_timestamp = int(now.timestamp())
+        from_timestamp = int((now - timedelta(minutes=30)).timestamp())
+        
+        candles = finnhub_client.stock_candles(
+            symbol=ticker,
+            resolution='1',
+            _from=from_timestamp,
+            to=to_timestamp
+        )
+        
+        if not candles or not candles.get('c') or len(candles['c']) == 0:
+            return None
+        
+        # Get the latest premarket price
+        latest_price = candles['c'][-1]
+        latest_volume = candles['v'][-1] if candles.get('v') else 0
+        
+        # Calculate change from previous close (need to fetch regular quote)
+        quote = finnhub_client.quote(ticker)
+        if quote and quote.get('pc'):
+            previous_close = quote['pc']
+            change = latest_price - previous_close
+            percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
+            
+            return {
+                'premarket_price': latest_price,
+                'premarket_change': change,
+                'premarket_percent_change': percent_change,
+                'premarket_volume': latest_volume,
+                'is_premarket': True
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Error fetching premarket data for {ticker}: {e}")
         return None
 
 
