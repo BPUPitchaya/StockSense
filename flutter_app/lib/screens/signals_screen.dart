@@ -38,7 +38,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
     setState(() { isLoading = true; error = null; searchedSignal = null; });
     try {
       final results = await Future.wait([
-        ApiService.getSignals(),
+        ApiService.getSignals(refresh: true),
         CurrencyService.load(),
       ]);
       if (mounted) {

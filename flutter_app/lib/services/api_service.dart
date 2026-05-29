@@ -111,9 +111,10 @@ class ApiService {
     return headers;
   }
 
-  static Future<List<Signal>> getSignals() async {
+  static Future<List<Signal>> getSignals({bool refresh = false}) async {
     final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl/signals'), headers: headers);
+    final url = refresh ? '$baseUrl/signals?refresh=true' : '$baseUrl/signals';
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
