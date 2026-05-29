@@ -29226,32 +29226,32 @@ _.b=b
 _.c=c
 _.d=d
 _.e=e},
-aN7(a){var s,r,q,p,o,n,m,l,k,j,i,h=null,g=a.h(0,"ticker")
-if(g==null)g=""
+aN7(a){var s,r,q,p,o,n,m,l,k,j,i=null,h=a.h(0,"ticker")
+if(h==null)h=""
 s=a.h(0,"name")
 r=A.c8(a.h(0,"current_price"))
 q=a.h(0,"ma50")
-q=q==null?h:J.pR(q)
+q=q==null?i:J.pR(q)
 p=a.h(0,"ma200")
-p=p==null?h:J.pR(p)
+p=p==null?i:J.pR(p)
 o=a.h(0,"rsi")
-o=o==null?h:J.pR(o)
+o=o==null?i:J.pR(o)
 n=a.h(0,"signal")
 if(n==null)n="HOLD"
 m=a.h(0,"date")
 if(m==null)m=""
 l=a.h(0,"percent_change")
-l=l==null?h:J.pR(l)
+l=l==null?i:J.pR(l)
 k=a.h(0,"is_premarket")
 if(k==null)k=!1
 j=a.h(0,"premarket_price")
-j=j==null?h:J.pR(j)
-i=a.h(0,"premarket_change")
-if(i!=null)J.pR(i)
-i=a.h(0,"premarket_percent_change")
-if(i!=null)J.pR(i)
-return new A.oV(g,s,r,q,p,o,n,m,l,k,j)},
-oV:function oV(a,b,c,d,e,f,g,h,i,j,k){var _=this
+if(j!=null)J.pR(j)
+j=a.h(0,"premarket_change")
+if(j!=null)J.pR(j)
+j=a.h(0,"premarket_percent_change")
+if(j!=null)J.pR(j)
+return new A.oV(h,s,r,q,p,o,n,m,l,k)},
+oV:function oV(a,b,c,d,e,f,g,h,i,j){var _=this
 _.a=a
 _.b=b
 _.c=c
@@ -29261,8 +29261,7 @@ _.f=f
 _.r=g
 _.w=h
 _.x=i
-_.y=j
-_.z=k},
+_.y=j},
 pW:function pW(a){this.a=a},
 G8:function G8(a,b,c){var _=this
 _.d=a
@@ -99387,7 +99386,7 @@ h=a.b
 if(h!=null)B.b.O(l,A.b([B.CA,A.W(h,1,B.af,i,A.ch(i,i,A.a6(153,q.t()>>>16&255,q.t()>>>8&255,q.t()&255),i,i,i,i,i,i,i,i,12,i,i,i,i,i,!0,i,i,i,i,i,i,i,i),i,i,i)],k))
 l.push(B.bg)
 h=A.b([A.W(j.GF(a.c),i,i,i,A.ch(i,i,q,i,i,i,i,i,i,i,B.mk,24,i,i,B.a8,i,i,!0,i,i,i,i,i,i,i,i),i,i,i),B.Cz],k)
-if(a.y&&a.z!=null){q=A.a6(B.d.aE(25.5),B.bE.t()>>>16&255,B.bE.t()>>>8&255,B.bE.t()&255)
+if(a.y){q=A.a6(B.d.aE(25.5),B.bE.t()>>>16&255,B.bE.t()>>>8&255,B.bE.t()&255)
 o=A.cT(4)
 n=A.aFn(A.a6(B.d.aE(76.5),B.bE.t()>>>16&255,B.bE.t()>>>8&255,B.bE.t()&255))
 h.push(A.dm(i,A.W("Pre-market",i,i,i,A.ch(i,i,B.bE,i,i,i,i,i,i,i,i,10,i,i,B.bd,i,i,!0,i,i,i,i,i,i,i,i),i,i,i),B.r,i,i,new A.cv(q,i,n,o,i,i,B.at),i,i,i,i,B.qf,i,i,i))}h.push(B.cV)
