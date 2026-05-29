@@ -479,7 +479,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  if (signal.isPremarket && signal.premarketPrice != null)
+                  if (signal.isPremarket)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
