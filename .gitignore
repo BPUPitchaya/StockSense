@@ -12,6 +12,9 @@ venv/
 .venv/
 ENV/
 build/
+!flutter_app/build/
+!flutter_app/build/web/
+!flutter_app/build/web/**
 develop-eggs/
 dist/
 downloads/
