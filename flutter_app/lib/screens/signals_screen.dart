@@ -424,7 +424,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
+                      color: isInWatchlist ? Colors.black87 : cs.onSurface,
                       letterSpacing: 0.2,
                     ),
                   ),
