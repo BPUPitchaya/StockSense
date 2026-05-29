@@ -855,39 +855,28 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         if not is_premarket_hours():
             return None
         
-        # Try to get premarket candles
-        to_timestamp = int(now.timestamp())
-        from_timestamp = int((now - timedelta(minutes=30)).timestamp())
-        
+        # Use quote endpoint - current price during premarket hours
         try:
-            candles = finnhub_client.stock_candles(
-                symbol=ticker,
-                resolution='1',
-                _from=from_timestamp,
-                to=to_timestamp
-            )
-            
-            if candles and candles.get('c') and len(candles['c']) > 0:
-                latest_price = candles['c'][-1]
-                latest_volume = candles['v'][-1] if candles.get('v') else 0
+            quote = finnhub_client.quote(ticker)
+            if quote and quote.get('c') and quote.get('pc'):
+                current_price = quote['c']
+                previous_close = quote['pc']
+                change = current_price - previous_close
+                percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
                 
-                quote = finnhub_client.quote(ticker)
-                if quote and quote.get('pc'):
-                    previous_close = quote['pc']
-                    change = latest_price - previous_close
-                    percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
-                    
-                    return {
-                        'premarket_price': latest_price,
-                        'premarket_change': change,
-                        'premarket_percent_change': percent_change,
-                        'premarket_volume': latest_volume,
-                        'is_premarket': True
-                    }
+                print(f"Premarket data for {ticker}: ${current_price} ({percent_change:.2f}%)")
+                
+                return {
+                    'premarket_price': current_price,
+                    'premarket_change': change,
+                    'premarket_percent_change': percent_change,
+                    'is_premarket': True
+                }
         except Exception as e:
-            print(f"Finnhub candles failed for {ticker}: {e}")
+            print(f"Finnhub quote failed for {ticker}: {e}")
         
         # Fallback: just return premarket flag without price data
+        print(f"No premarket price data for {ticker}")
         return {
             'is_premarket': True,
             'premarket_price': None,
