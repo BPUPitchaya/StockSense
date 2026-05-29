@@ -853,10 +853,14 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         
         # Only fetch during premarket hours (4:00 AM - 9:30 AM ET)
         if not is_premarket_hours():
+            print(f"Not premarket hours for {ticker}")
             return None
+        
+        print(f"Fetching premarket data for {ticker} during premarket hours...")
         
         # Use Finnhub quote endpoint - current price during premarket hours
         quote = finnhub_client.quote(ticker)
+        print(f"Finnhub quote for {ticker}: {quote}")
         
         if quote and quote.get('c') and quote.get('pc'):
             current_price = quote['c']
@@ -883,6 +887,8 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         }
     except Exception as e:
         print(f"Error fetching premarket data for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
