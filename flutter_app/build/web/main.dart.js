@@ -29712,17 +29712,18 @@ s=1
 break
 case 1:return A.G(q,r)}})
 return A.H($async$fF,r)},
-M0(){var s=0,r=A.I(t.xu),q,p,o,n
-var $async$M0=A.J(function(a,b){if(a===1)return A.F(b,r)
+M0(a){var s=0,r=A.I(t.xu),q,p,o,n
+var $async$M0=A.J(function(b,c){if(b===1)return A.F(c,r)
 for(;;)switch(s){case 0:s=3
 return A.y(A.fF(),$async$M0)
-case 3:o=b
+case 3:p=c
+o=$.df()
 s=4
-return A.y(A.fT(A.c7($.df()+"/signals"),o),$async$M0)
-case 4:n=b
-if(n.b===200){p=J.d5(B.U.bd(A.e9(A.e8(n.e)).bd(n.w)),new A.a4D(),t.O1)
-p=A.Z(p,p.$ti.i("a9.E"))
-q=p
+return A.y(A.fT(A.c7(o+"/signals?refresh=true"),p),$async$M0)
+case 4:n=c
+if(n.b===200){o=J.d5(B.U.bd(A.e9(A.e8(n.e)).bd(n.w)),new A.a4D(),t.O1)
+o=A.Z(o,o.$ti.i("a9.E"))
+q=o
 s=1
 break}else throw A.i(A.bA("Failed to get signals: "+n.gdO()))
 case 1:return A.G(q,r)}})
@@ -99177,7 +99178,7 @@ var $async$v2=A.J(function(a,b){if(a===1){p.push(b)
 s=q}for(;;)switch(s){case 0:o.K(new A.azM(o))
 q=3
 s=6
-return A.y(A.iL(A.b([A.M0(),A.kl()],t.mo),t.H),$async$v2)
+return A.y(A.iL(A.b([A.M0(!0),A.kl()],t.mo),t.H),$async$v2)
 case 6:n=b
 if(o.c!=null)o.K(new A.azN(o,n))
 q=1
