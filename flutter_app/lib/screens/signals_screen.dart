@@ -487,23 +487,14 @@ class _SignalsScreenState extends State<SignalsScreen> {
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: Colors.purple.withOpacity(0.3)),
                       ),
-                      child: signal.premarketPrice != null
-                          ? Text(
-                              'Pre-market: ${_formatPrice(signal.premarketPrice!)}${signal.premarketPercentChange != null ? ' (${signal.premarketPercentChange! >= 0 ? '+' : ''}${signal.premarketPercentChange!.toStringAsFixed(2)}%)' : ''}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.purple,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          : Text(
-                              'Pre-market',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.purple,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                      child: Text(
+                        'Pre-market',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.purple,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   const SizedBox(width: 8),
                   if (pc != null && !signal.isPremarket)

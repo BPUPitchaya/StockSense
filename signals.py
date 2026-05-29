@@ -846,39 +846,17 @@ def get_market_hours() -> Dict:
 
 
 def get_premarket_data(ticker: str) -> Optional[Dict]:
-    """Get premarket data from Finnhub quote endpoint"""
+    """Get premarket flag (free APIs don't provide premarket price data)"""
     try:
         et = pytz.timezone('US/Eastern')
         now = datetime.now(et)
         
-        # Only fetch during premarket hours (4:00 AM - 9:30 AM ET)
+        # Only return flag during premarket hours (4:00 AM - 9:30 AM ET)
         if not is_premarket_hours():
-            print(f"Not premarket hours for {ticker}")
             return None
         
-        print(f"Fetching premarket data for {ticker} during premarket hours...")
-        
-        # Use Finnhub quote endpoint - current price during premarket hours
-        quote = finnhub_client.quote(ticker)
-        print(f"Finnhub quote for {ticker}: {quote}")
-        
-        if quote and quote.get('c') and quote.get('pc'):
-            current_price = quote['c']
-            previous_close = quote['pc']
-            change = current_price - previous_close
-            percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
-            
-            print(f"Premarket data for {ticker} (Finnhub): ${current_price} ({percent_change:.2f}%)")
-            
-            return {
-                'premarket_price': current_price,
-                'premarket_change': change,
-                'premarket_percent_change': percent_change,
-                'is_premarket': True
-            }
-        else:
-            print(f"No premarket price for {ticker} - quote: {quote}")
-        
+        # Free APIs don't provide reliable premarket price data
+        # Just return the flag for badge display
         return {
             'is_premarket': True,
             'premarket_price': None,
@@ -886,9 +864,7 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
             'premarket_percent_change': None
         }
     except Exception as e:
-        print(f"Error fetching premarket data for {ticker}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error checking premarket hours: {e}")
         return None
 
 
