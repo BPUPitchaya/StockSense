@@ -698,23 +698,19 @@ def get_user_by_email(email: str) -> Optional[Dict]:
         session.close()
 
 def send_verification_email(email: str, token: str, token_type: str = 'email_verification') -> bool:
-    """Send verification or password reset email"""
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
+    """Send verification or password reset email using SendGrid"""
     import os
     from dotenv import load_dotenv
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
     
     load_dotenv()
     
-    # SMTP configuration
-    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port = int(os.getenv('SMTP_PORT', '587'))
-    smtp_username = os.getenv('SMTP_USERNAME')
-    smtp_password = os.getenv('SMTP_PASSWORD')
+    # SendGrid API key
+    sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
     
-    if not smtp_username or not smtp_password:
-        print("SMTP credentials not configured")
+    if not sendgrid_api_key:
+        print("SendGrid API key not configured")
         return False
     
     try:
@@ -722,7 +718,7 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
         if token_type == 'email_verification':
             subject = "Verify your StockSense account"
             verification_url = f"https://stocksense-h0n6.onrender.com/verify-email?token={token}"
-            body = f"""
+            html_content = f"""
             <html>
             <body>
                 <h2>Welcome to StockSense!</h2>
@@ -736,7 +732,7 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
         else:  # password_reset
             subject = "Reset your StockSense password"
             reset_url = f"https://stocksense-h0n6.onrender.com/reset-password?token={token}"
-            body = f"""
+            html_content = f"""
             <html>
             <body>
                 <h2>Reset your password</h2>
@@ -748,36 +744,26 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
             </html>
             """
         
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = smtp_username
-        msg['To'] = email
+        # Create SendGrid message
+        message = Mail(
+            from_email='noreply@stocksense.app',
+            to_emails=email,
+            subject=subject,
+            html_content=html_content
+        )
         
-        # Attach HTML body
-        html_part = MIMEText(body, 'html')
-        msg.attach(html_part)
+        # Send email
+        print(f"Attempting to send email to {email} via SendGrid")
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
         
-        # Send email with timeout
-        print(f"Attempting to send email to {email} via {smtp_server}:{smtp_port}")
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-            print("SMTP connection established")
-            server.starttls()
-            print("TLS started")
-            server.login(smtp_username, smtp_password)
-            print("Login successful")
-            server.send_message(msg)
-            print(f"Email sent to {email}")
-        return True
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"SMTP authentication error: {e}")
-        return False
-    except smtplib.SMTPConnectError as e:
-        print(f"SMTP connection error: {e}")
-        return False
-    except smtplib.SMTPException as e:
-        print(f"SMTP error: {e}")
-        return False
+        if response.status_code in [200, 202]:
+            print(f"Email sent to {email} successfully")
+            return True
+        else:
+            print(f"SendGrid returned status code: {response.status_code}")
+            print(f"Response body: {response.body}")
+            return False
     except Exception as e:
-        print(f"Error sending email: {e}")
+        print(f"Error sending email via SendGrid: {e}")
         return False
