@@ -157,6 +157,7 @@ def verify_user(email: str, password: str) -> Optional[Dict]:
             return {
                 'id': user.id,
                 'email': user.email,
+                'is_verified': user.is_verified,
                 'created_at': user.created_at.isoformat() if user.created_at else None
             }
         return None
