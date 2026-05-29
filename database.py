@@ -708,6 +708,7 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
     
     # SendGrid API key
     sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+    sender_email = os.getenv('SMTP_USERNAME', 'noreply@stocksense.app')
     
     if not sendgrid_api_key:
         print("SendGrid API key not configured")
@@ -746,7 +747,7 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
         
         # Create SendGrid message
         message = Mail(
-            from_email='noreply@stocksense.app',
+            from_email=sender_email,
             to_emails=email,
             subject=subject,
             html_content=html_content
