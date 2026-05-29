@@ -21,6 +21,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     preferred_currency = Column(String, default='USD')  # User's preferred currency
+    is_verified = Column(Boolean, default=False)  # Email verification status
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class PortfolioPosition(Base):
@@ -45,6 +46,16 @@ class Budget(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     amount = Column(Float, default=0.0)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+class VerificationToken(Base):
+    __tablename__ = 'verification_tokens'
+    id = Column(Integer, primary_key=True)
+    email = Column(String, nullable=False)
+    token = Column(String, unique=True, nullable=False)
+    token_type = Column(String, nullable=False)  # 'email_verification' or 'password_reset'
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class PredictionHistory(Base):
     __tablename__ = 'prediction_history'
@@ -565,3 +576,182 @@ def get_predictions_due_for_check() -> List[Dict]:
         return []
     finally:
         session.close()
+
+def create_verification_token(email: str, token_type: str = 'email_verification', hours_valid: int = 24) -> str:
+    """Create a verification token for email verification or password reset"""
+    import secrets
+    session = SessionLocal()
+    try:
+        # Generate secure random token
+        token = secrets.token_urlsafe(32)
+        
+        # Set expiration
+        expires_at = datetime.utcnow() + timedelta(hours=hours_valid)
+        
+        # Create token record
+        verification_token = VerificationToken(
+            email=email,
+            token=token,
+            token_type=token_type,
+            expires_at=expires_at
+        )
+        
+        session.add(verification_token)
+        session.commit()
+        
+        return token
+    except Exception as e:
+        print(f"Error creating verification token: {e}")
+        session.rollback()
+        return None
+    finally:
+        session.close()
+
+def verify_token(token: str, token_type: str) -> Optional[str]:
+    """Verify a token and return the email if valid"""
+    session = SessionLocal()
+    try:
+        verification_token = session.query(VerificationToken).filter(
+            VerificationToken.token == token,
+            VerificationToken.token_type == token_type,
+            VerificationToken.used == False,
+            VerificationToken.expires_at > datetime.utcnow()
+        ).first()
+        
+        if verification_token:
+            # Mark as used
+            verification_token.used = True
+            session.commit()
+            return verification_token.email
+        else:
+            return None
+    except Exception as e:
+        print(f"Error verifying token: {e}")
+        return None
+    finally:
+        session.close()
+
+def mark_user_verified(email: str) -> bool:
+    """Mark a user's email as verified"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.email == email).first()
+        if user:
+            user.is_verified = True
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error marking user as verified: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def update_user_password(email: str, new_password_hash: str) -> bool:
+    """Update a user's password"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.email == email).first()
+        if user:
+            user.password_hash = new_password_hash
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error updating user password: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """Get user by email"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.email == email).first()
+        if user:
+            return {
+                'id': user.id,
+                'email': user.email,
+                'is_verified': user.is_verified
+            }
+        return None
+    except Exception as e:
+        print(f"Error getting user by email: {e}")
+        return None
+    finally:
+        session.close()
+
+def send_verification_email(email: str, token: str, token_type: str = 'email_verification') -> bool:
+    """Send verification or password reset email"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
+    # SMTP configuration
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    smtp_username = os.getenv('SMTP_USERNAME')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    
+    if not smtp_username or not smtp_password:
+        print("SMTP credentials not configured")
+        return False
+    
+    try:
+        # Create email content
+        if token_type == 'email_verification':
+            subject = "Verify your StockSense account"
+            verification_url = f"https://stocksense-h0n6.onrender.com/verify-email?token={token}"
+            body = f"""
+            <html>
+            <body>
+                <h2>Welcome to StockSense!</h2>
+                <p>Please verify your email address by clicking the link below:</p>
+                <p><a href="{verification_url}">Verify Email</a></p>
+                <p>This link will expire in 24 hours.</p>
+                <p>If you didn't create an account, you can safely ignore this email.</p>
+            </body>
+            </html>
+            """
+        else:  # password_reset
+            subject = "Reset your StockSense password"
+            reset_url = f"https://stocksense-h0n6.onrender.com/reset-password?token={token}"
+            body = f"""
+            <html>
+            <body>
+                <h2>Reset your password</h2>
+                <p>Click the link below to reset your password:</p>
+                <p><a href="{reset_url}">Reset Password</a></p>
+                <p>This link will expire in 1 hour.</p>
+                <p>If you didn't request a password reset, you can safely ignore this email.</p>
+            </body>
+            </html>
+            """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = smtp_username
+        msg['To'] = email
+        
+        # Attach HTML body
+        html_part = MIMEText(body, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        
+        print(f"Email sent to {email}")
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False

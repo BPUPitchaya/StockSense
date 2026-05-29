@@ -235,11 +235,21 @@ def read_root():
 
 @app.post("/signup")
 def signup(request: SignupRequest):
-    """User signup endpoint"""
+    """User signup endpoint with email verification"""
     try:
         success = database.create_user(request.email, request.password)
         if success:
-            return {"message": "User created successfully"}
+            # Create verification token
+            token = database.create_verification_token(request.email, 'email_verification', 24)
+            if token:
+                # Send verification email
+                email_sent = database.send_verification_email(request.email, token, 'email_verification')
+                if email_sent:
+                    return {"message": "User created successfully. Please check your email to verify your account."}
+                else:
+                    return {"message": "User created successfully. Email verification failed (SMTP not configured)."}
+            else:
+                return {"message": "User created successfully. Verification token generation failed."}
         else:
             raise HTTPException(status_code=400, detail="User already exists")
     except HTTPException:
@@ -249,10 +259,14 @@ def signup(request: SignupRequest):
 
 @app.post("/login")
 def login(request: LoginRequest):
-    """User login endpoint"""
+    """User login endpoint with email verification check"""
     try:
         user = database.verify_user(request.email, request.password)
         if user:
+            # Check if email is verified
+            if not user.get('is_verified', False):
+                raise HTTPException(status_code=403, detail="Please verify your email before logging in")
+            
             token = create_jwt_token({"sub": user['email'], "user_id": user['id']})
             return {
                 "access_token": token,
@@ -274,6 +288,83 @@ def admin_login(request: LoginRequest):
             return {"message": "Admin login successful", "email": request.email}
         else:
             raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/verify-email")
+def verify_email(token: str):
+    """Verify email with token"""
+    try:
+        email = database.verify_token(token, 'email_verification')
+        if email:
+            success = database.mark_user_verified(email)
+            if success:
+                return {"message": "Email verified successfully. You can now log in."}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to mark user as verified")
+        else:
+            raise HTTPException(status_code=400, detail="Invalid or expired token")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/forgot-password")
+def forgot_password(request: dict):
+    """Send password reset email"""
+    try:
+        email = request.get('email')
+        if not email:
+            raise HTTPException(status_code=400, detail="Email is required")
+        
+        # Check if user exists
+        user = database.get_user_by_email(email)
+        if not user:
+            # Don't reveal if user exists for security
+            return {"message": "If an account exists with this email, a password reset link has been sent."}
+        
+        # Create reset token (1 hour expiry)
+        token = database.create_verification_token(email, 'password_reset', 1)
+        if token:
+            # Send reset email
+            email_sent = database.send_verification_email(email, token, 'password_reset')
+            if email_sent:
+                return {"message": "Password reset email sent successfully."}
+            else:
+                return {"message": "Password reset email failed (SMTP not configured)."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate reset token")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/reset-password")
+def reset_password(request: dict):
+    """Reset password with token"""
+    try:
+        token = request.get('token')
+        new_password = request.get('new_password')
+        
+        if not token or not new_password:
+            raise HTTPException(status_code=400, detail="Token and new password are required")
+        
+        # Verify token
+        email = database.verify_token(token, 'password_reset')
+        if not email:
+            raise HTTPException(status_code=400, detail="Invalid or expired token")
+        
+        # Hash new password
+        password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        
+        # Update password
+        success = database.update_user_password(email, password_hash)
+        if success:
+            return {"message": "Password reset successfully. You can now log in with your new password."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update password")
     except HTTPException:
         raise
     except Exception as e:

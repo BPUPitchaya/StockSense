@@ -10,3 +10,4 @@ finnhub-python
 PyJWT
 redis==5.0.0
 pytz
+python-dotenv
