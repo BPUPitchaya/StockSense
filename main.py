@@ -344,9 +344,27 @@ def get_categories():
     return {"categories": list(signals.CATEGORIES.keys())}
 
 @app.get("/signals")
-def get_signals(category: Optional[str] = None):
+def get_signals(category: Optional[str] = None, refresh: bool = False):
     """Get trading signals - instant with stale-while-revalidate"""
     cache_key = get_cache_key("signals_5stocks", category=category or "all")
+    
+    # Force refresh bypasses cache
+    if refresh:
+        print("Force refresh requested - bypassing cache")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                all_signals_data = signals.get_all_signals()
+                if all_signals_data:
+                    print(f"Generated {len(all_signals_data)} signals (force refresh)")
+                    clean_data = clean_for_json(all_signals_data)
+                    set_cache(cache_key, clean_data)
+                    return clean_data
+            except Exception as e:
+                print(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+        raise HTTPException(status_code=503, detail="Stock data temporarily unavailable. Please try again.")
     
     # Use shorter cache during premarket hours (1 minute vs 10 minutes)
     is_premarket = signals.is_premarket_hours()
