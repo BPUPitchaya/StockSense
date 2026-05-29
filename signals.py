@@ -846,7 +846,7 @@ def get_market_hours() -> Dict:
 
 
 def get_premarket_data(ticker: str) -> Optional[Dict]:
-    """Get premarket data from Finnhub"""
+    """Get premarket data from Yahoo Finance"""
     try:
         et = pytz.timezone('US/Eastern')
         now = datetime.now(et)
@@ -855,28 +855,44 @@ def get_premarket_data(ticker: str) -> Optional[Dict]:
         if not is_premarket_hours():
             return None
         
-        # Use quote endpoint - current price during premarket hours
-        try:
-            quote = finnhub_client.quote(ticker)
-            if quote and quote.get('c') and quote.get('pc'):
-                current_price = quote['c']
-                previous_close = quote['pc']
-                change = current_price - previous_close
+        # Use Yahoo Finance API for premarket data
+        import requests
+        
+        url = f'https://query1.finance.yahoo.com/v7/finance/options/{ticker}'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            result = data['optionChain']['result'][0]['quote']
+            
+            premarket_price = result.get('preMarketPrice')
+            premarket_change_percent = result.get('preMarketChangePercent')
+            market_state = result.get('marketState')
+            previous_close = result.get('regularMarketPreviousClose')
+            
+            if premarket_price and previous_close:
+                change = premarket_price - previous_close
                 percent_change = (change / previous_close) * 100 if previous_close > 0 else 0
                 
-                print(f"Premarket data for {ticker}: ${current_price} ({percent_change:.2f}%)")
+                print(f"Premarket data for {ticker} (Yahoo): ${premarket_price} ({percent_change:.2f}%) - State: {market_state}")
                 
                 return {
-                    'premarket_price': current_price,
+                    'premarket_price': premarket_price,
                     'premarket_change': change,
                     'premarket_percent_change': percent_change,
-                    'is_premarket': True
+                    'is_premarket': True,
+                    'market_state': market_state
                 }
-        except Exception as e:
-            print(f"Finnhub quote failed for {ticker}: {e}")
+            else:
+                print(f"No premarket price for {ticker} - State: {market_state}")
+        else:
+            print(f"Yahoo Finance API failed for {ticker}: {response.status_code}")
         
         # Fallback: just return premarket flag without price data
-        print(f"No premarket price data for {ticker}")
         return {
             'is_premarket': True,
             'premarket_price': None,
