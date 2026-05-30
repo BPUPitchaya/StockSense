@@ -40,12 +40,14 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   
   // Historical predictions for accuracy tracking
   List<Map<String, dynamic>> _predictionHistory = [];
+  
+  // Projection data from backend
+  Map<String, dynamic>? _projectionData;
 
   // Chart period selector
   String _selectedPeriod = '1y';
-  final List<String> _periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'];
+  final List<String> _periods = ['5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'];
   final Map<String, String> _periodLabels = {
-    '1d': '1 Day',
     '5d': '5 Days',
     '1mo': '1 Month',
     '3mo': '3 Months',
@@ -106,6 +108,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         ApiService.getStockHistory(widget.signal.ticker, _selectedPeriod),
         ApiService.getStockInfo(widget.signal.ticker),
         ApiService.getPredictionHistory(widget.signal.ticker),
+        ApiService.getProjection(widget.signal.ticker, _selectedPeriod),
       ]);
       
       if (mounted) {
@@ -113,6 +116,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           historicalData = results[0] as List<HistoricalData>;
           stockInfo = results[1] as Map<String, dynamic>;
           _predictionHistory = results[2] as List<Map<String, dynamic>>;
+          _projectionData = results[3] as Map<String, dynamic>;
           isLoading = false;
         });
       }
@@ -515,44 +519,40 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   }
 
   Widget _buildPeriodSelector() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Chart Period',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _periods.map((period) {
-                final isSelected = _selectedPeriod == period;
-                return ChoiceChip(
-                  label: Text(_periodLabels[period] ?? period),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _selectedPeriod = period;
-                      });
-                      _loadData();
-                    }
-                  },
-                  selectedColor: Colors.blue,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _periods.map((period) {
+            final isSelected = _selectedPeriod == period;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedPeriod = period;
+                  });
+                  _loadData();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                );
-              }).toList(),
-            ),
-          ],
+                  child: Text(
+                    _periodLabels[period] ?? period,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.black87,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -602,9 +602,24 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final hasMA50 = ma50Spots.isNotEmpty;
     final hasMA200 = ma200Spots.isNotEmpty;
 
-    // Calculate future projection based on signal (30 days forward)
+    // Use projection from backend if available, otherwise fall back to simple calculation
     final projectionSpots = <FlSpot>[];
-    if (historicalData.isNotEmpty) {
+    if (_projectionData != null && historicalData.isNotEmpty) {
+      final projection = _projectionData!['projection'] as List<dynamic>?;
+      if (projection != null && projection.isNotEmpty) {
+        final lastIndex = historicalData.length - 1;
+        final lastPrice = historicalData.last.close;
+        // Start from the last actual data point for smooth connection
+        projectionSpots.add(FlSpot(lastIndex.toDouble(), lastPrice));
+        // Add projection points from backend
+        for (var point in projection) {
+          final day = point['day'] as int;
+          final price = point['price'] as double;
+          projectionSpots.add(FlSpot((lastIndex + day).toDouble(), price));
+        }
+      }
+    } else if (historicalData.isNotEmpty && historicalData.length >= 5) {
+      // Fallback to simple calculation if backend projection not available
       final lastPrice = historicalData.last.close;
       final lastIndex = historicalData.length - 1;
       // Determine trend based on signal
@@ -612,7 +627,11 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       final trend = signalUpper.contains('BUY') ? 0.002 : signalUpper.contains('SELL') ? -0.002 : 0.0;
       // Daily volatility approximation
       final volatility = (rawMax - rawMin) / prices.length;
-      for (int i = 1; i <= 30; i++) {
+      // Projection length: proportional to data length (max 30 days, min 3 days)
+      final projectionDays = (historicalData.length * 0.3).clamp(3, 30).toInt();
+      // Start from the last actual data point for smooth connection
+      projectionSpots.add(FlSpot(lastIndex.toDouble(), lastPrice));
+      for (int i = 1; i <= projectionDays; i++) {
         final projectedPrice = lastPrice * (1 + (trend * i)) + (volatility * 0.1 * i);
         projectionSpots.add(FlSpot((lastIndex + i).toDouble(), projectedPrice));
       }
@@ -675,9 +694,9 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               padding: const EdgeInsets.only(left: 8),
               child: Row(
                 children: [
-                  const Text(
-                    'Price Chart (1 Year)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    'Price Chart (${_periodLabels[_selectedPeriod] ?? _selectedPeriod})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 8),
                   Container(

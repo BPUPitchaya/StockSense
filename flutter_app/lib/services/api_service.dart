@@ -317,6 +317,15 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getProjection(String ticker, String period) async {
+    final response = await http.get(Uri.parse('$baseUrl/projection/$ticker?period=$period'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get projection: ${response.body}');
+    }
+  }
+
   static Future<Map<String, dynamic>> getMarketStatus() async {
     final response = await http.get(Uri.parse('$baseUrl/market/status'));
     if (response.statusCode == 200) {
