@@ -235,21 +235,11 @@ def read_root():
 
 @app.post("/signup")
 def signup(request: SignupRequest):
-    """User signup endpoint with email verification"""
+    """User signup endpoint - email verification temporarily disabled"""
     try:
         success = database.create_user(request.email, request.password)
         if success:
-            # Create verification token
-            token = database.create_verification_token(request.email, 'email_verification', 24)
-            if token:
-                # Send verification email (non-blocking - won't fail signup if email fails)
-                try:
-                    database.send_verification_email(request.email, token, 'email_verification')
-                except Exception as e:
-                    print(f"Email sending failed (non-critical): {e}")
-                return {"message": "User created successfully. Please check your email to verify your account."}
-            else:
-                return {"message": "User created successfully. Verification token generation failed."}
+            return {"message": "User created successfully. You can now log in."}
         else:
             raise HTTPException(status_code=400, detail="User already exists")
     except HTTPException:
@@ -259,14 +249,11 @@ def signup(request: SignupRequest):
 
 @app.post("/login")
 def login(request: LoginRequest):
-    """User login endpoint with email verification check"""
+    """User login endpoint - email verification check temporarily disabled"""
     try:
         user = database.verify_user(request.email, request.password)
         if user:
-            # Check if email is verified
-            if not user.get('is_verified', False):
-                raise HTTPException(status_code=403, detail="Please verify your email before logging in")
-            
+            # Email verification check temporarily disabled
             token = create_jwt_token({"sub": user['email'], "user_id": user['id']})
             return {
                 "access_token": token,
