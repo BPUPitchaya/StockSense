@@ -716,15 +716,15 @@ def get_projection(ticker: str, period: str = "1y"):
         elif rsi < 40:
             score += 1  # Buy signal
         elif rsi > 70:
-            score -= 2  # Strong sell signal
+            score -= 3  # Strong sell signal (increased weight)
         elif rsi > 60:
-            score -= 1  # Sell signal
+            score -= 2  # Sell signal (increased weight)
         
         # MACD factor
         if macd_above:
             score += 1
         else:
-            score -= 1
+            score -= 2  # Increased weight for bearish MACD
         
         # Trend strength factor
         if trend_strength == 'Strong':
@@ -736,11 +736,14 @@ def get_projection(ticker: str, period: str = "1y"):
         if current_price > ma50 > ma200:
             score += 1  # Bullish alignment
         elif current_price < ma50 < ma200:
-            score -= 1  # Bearish alignment
+            score -= 2  # Bearish alignment (increased weight)
+        
+        # Add slight downward bias (market gravity)
+        score -= 0.5
         
         # Calculate daily change percentage based on score
-        # Score range typically -5 to +5, map to -0.5% to +0.5% daily
-        daily_change = (score / 10) * 0.01  # Max 0.5% daily change
+        # Score range typically -7 to +5, map to -0.7% to +0.5% daily
+        daily_change = (score / 10) * 0.01  # Max 0.7% daily change down, 0.5% up
         
         # Calculate projection for next 30 days
         projection = []
@@ -749,11 +752,18 @@ def get_projection(ticker: str, period: str = "1y"):
         # Volatility based on recent price range
         prices = [h['close'] for h in history]
         price_range = max(prices) - min(prices)
-        volatility = price_range / len(prices) * 0.1
+        volatility = price_range / len(prices) * 0.15
+        
+        import math
         
         for day in range(1, 31):
-            # Apply daily change with some randomness (volatility)
-            projected_price = last_price * (1 + daily_change) + (volatility * (day % 3 - 1))
+            # Add sine wave oscillation for realistic curves
+            wave = math.sin(day * 0.5) * volatility * 0.5
+            # Add smaller high-frequency noise
+            noise = math.sin(day * 2) * volatility * 0.2
+            
+            # Apply daily change with wave patterns
+            projected_price = last_price * (1 + daily_change) + wave + noise
             projection.append({
                 'day': day,
                 'price': projected_price
