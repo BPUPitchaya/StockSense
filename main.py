@@ -678,6 +678,106 @@ def get_stock_history(ticker: str, period: str = "3mo"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/projection/{ticker}")
+def get_projection(ticker: str, period: str = "1y"):
+    """Get price projection based on technical indicators"""
+    try:
+        # Get stock analysis with indicators
+        analysis = signals.analyze_stock(ticker)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Could not analyze stock")
+        
+        # Get historical data for projection
+        history = signals.get_stock_history(ticker, period)
+        if not history or len(history) < 5:
+            raise HTTPException(status_code=400, detail="Insufficient historical data")
+        
+        # Extract indicator values
+        rsi = analysis.get('rsi', 50)
+        macd = analysis.get('macd', {})
+        macd_line = macd.get('macd_line', 0)
+        macd_signal = macd.get('signal_line', 0)
+        macd_above = macd.get('macd_above_signal', False)
+        
+        adx = analysis.get('adx', {})
+        adx_value = adx.get('adx', 20)
+        trend_strength = adx.get('trend_strength', 'Weak')
+        
+        ma50 = analysis.get('ma50', 0)
+        ma200 = analysis.get('ma200', 0)
+        current_price = analysis.get('current_price', 0)
+        
+        # Calculate projection strength based on indicators
+        score = 0
+        
+        # RSI factor (oversold < 30 = bullish, overbought > 70 = bearish)
+        if rsi < 30:
+            score += 2  # Strong buy signal
+        elif rsi < 40:
+            score += 1  # Buy signal
+        elif rsi > 70:
+            score -= 2  # Strong sell signal
+        elif rsi > 60:
+            score -= 1  # Sell signal
+        
+        # MACD factor
+        if macd_above:
+            score += 1
+        else:
+            score -= 1
+        
+        # Trend strength factor
+        if trend_strength == 'Strong':
+            score *= 1.5
+        elif trend_strength == 'Moderate':
+            score *= 1.2
+        
+        # Moving average factor
+        if current_price > ma50 > ma200:
+            score += 1  # Bullish alignment
+        elif current_price < ma50 < ma200:
+            score -= 1  # Bearish alignment
+        
+        # Calculate daily change percentage based on score
+        # Score range typically -5 to +5, map to -0.5% to +0.5% daily
+        daily_change = (score / 10) * 0.01  # Max 0.5% daily change
+        
+        # Calculate projection for next 30 days
+        projection = []
+        last_price = current_price
+        
+        # Volatility based on recent price range
+        prices = [h['close'] for h in history]
+        price_range = max(prices) - min(prices)
+        volatility = price_range / len(prices) * 0.1
+        
+        for day in range(1, 31):
+            # Apply daily change with some randomness (volatility)
+            projected_price = last_price * (1 + daily_change) + (volatility * (day % 3 - 1))
+            projection.append({
+                'day': day,
+                'price': projected_price
+            })
+            last_price = projected_price
+        
+        return {
+            'ticker': ticker,
+            'current_price': current_price,
+            'score': score,
+            'daily_change_pct': daily_change * 100,
+            'projection': projection,
+            'indicators': {
+                'rsi': rsi,
+                'macd_above_signal': macd_above,
+                'trend_strength': trend_strength,
+                'adx': adx_value
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/portfolio")
 def add_position(position: Position, authorization: str = Header(...)):
     """Add a position to portfolio"""
