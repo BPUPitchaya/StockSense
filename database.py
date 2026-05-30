@@ -702,7 +702,8 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
     import os
     from dotenv import load_dotenv
     from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, SandBoxMode
+    from sendgrid.helpers.mail import Mail
+    from sendgrid.helpers.mail import MailSettings, SandboxMode
     
     load_dotenv()
     
@@ -752,7 +753,8 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
             subject=subject,
             html_content=html_content
         )
-        message.set_sand_box_mode(SandBoxMode(True))
+        message.mail_settings = MailSettings()
+        message.mail_settings.sandbox_mode = SandboxMode(enable=True)
         
         # Send email
         print(f"Attempting to send email to {email} via SendGrid Sandbox")
