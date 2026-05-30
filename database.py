@@ -698,12 +698,11 @@ def get_user_by_email(email: str) -> Optional[Dict]:
         session.close()
 
 def send_verification_email(email: str, token: str, token_type: str = 'email_verification') -> bool:
-    """Send verification or password reset email using SendGrid Sandbox"""
+    """Send verification or password reset email using SendGrid"""
     import os
     from dotenv import load_dotenv
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
-    from sendgrid.helpers.mail import MailSettings, SandboxMode
     
     load_dotenv()
     
@@ -746,23 +745,21 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
             </html>
             """
         
-        # Create SendGrid message with sandbox mode
+        # Create SendGrid message
         message = Mail(
             from_email=sender_email,
             to_emails=email,
             subject=subject,
             html_content=html_content
         )
-        message.mail_settings = MailSettings()
-        message.mail_settings.sandbox_mode = SandboxMode(enable=True)
         
         # Send email
-        print(f"Attempting to send email to {email} via SendGrid Sandbox")
+        print(f"Attempting to send email to {email} via SendGrid")
         sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
         
         if response.status_code in [200, 202]:
-            print(f"Email sent to {email} successfully (sandbox mode)")
+            print(f"Email sent to {email} successfully")
             return True
         else:
             print(f"SendGrid returned status code: {response.status_code}")
