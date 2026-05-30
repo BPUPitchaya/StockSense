@@ -108,15 +108,23 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         ApiService.getStockHistory(widget.signal.ticker, _selectedPeriod),
         ApiService.getStockInfo(widget.signal.ticker),
         ApiService.getPredictionHistory(widget.signal.ticker),
-        ApiService.getProjection(widget.signal.ticker, _selectedPeriod),
       ]);
+      
+      // Try to get projection, but don't fail if it errors
+      Map<String, dynamic>? projectionData;
+      try {
+        projectionData = await ApiService.getProjection(widget.signal.ticker, _selectedPeriod);
+      } catch (e) {
+        print('Failed to load projection: $e');
+        projectionData = null;
+      }
       
       if (mounted) {
         setState(() {
           historicalData = results[0] as List<HistoricalData>;
           stockInfo = results[1] as Map<String, dynamic>;
           _predictionHistory = results[2] as List<Map<String, dynamic>>;
-          _projectionData = results[3] as Map<String, dynamic>;
+          _projectionData = projectionData;
           isLoading = false;
         });
       }
