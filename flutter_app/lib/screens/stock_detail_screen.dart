@@ -41,6 +41,23 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   // Historical predictions for accuracy tracking
   List<Map<String, dynamic>> _predictionHistory = [];
 
+  // Chart period selector
+  String _selectedPeriod = '1y';
+  final List<String> _periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'];
+  final Map<String, String> _periodLabels = {
+    '1d': '1 Day',
+    '5d': '5 Days',
+    '1mo': '1 Month',
+    '3mo': '3 Months',
+    '6mo': '6 Months',
+    '1y': '1 Year',
+    '2y': '2 Years',
+    '5y': '5 Years',
+    '10y': '10 Years',
+    'ytd': 'YTD',
+    'max': 'All Time',
+  };
+
   /// Currency symbols for native formatting
   static const _currencySymbols = {
     'USD': '\$', 'AUD': 'A\$', 'NZD': 'NZ\$', 'GBP': '£',
@@ -86,7 +103,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
 
     try {
       final results = await Future.wait([
-        ApiService.getStockHistory(widget.signal.ticker, '1y'),
+        ApiService.getStockHistory(widget.signal.ticker, _selectedPeriod),
         ApiService.getStockInfo(widget.signal.ticker),
         ApiService.getPredictionHistory(widget.signal.ticker),
       ]);
@@ -424,6 +441,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                       const SizedBox(height: 16),
                       _buildAiAnalysisSection(),
                       const SizedBox(height: 24),
+                      _buildPeriodSelector(),
+                      const SizedBox(height: 16),
                       _buildPriceChart(),
                       const SizedBox(height: 24),
                       _buildDetailsSection(),
@@ -488,6 +507,50 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   fontSize: 18,
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPeriodSelector() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Chart Period',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _periods.map((period) {
+                final isSelected = _selectedPeriod == period;
+                return ChoiceChip(
+                  label: Text(_periodLabels[period] ?? period),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        _selectedPeriod = period;
+                      });
+                      _loadData();
+                    }
+                  },
+                  selectedColor: Colors.blue,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black,
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ),
