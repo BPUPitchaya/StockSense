@@ -208,7 +208,8 @@ def refresh_cache_async(key: str, refresh_func, *args, **kwargs):
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize database only - cache warms on first request"""
+    """Initialize database and clear cache - cache warms on first request"""
+    _cache.clear()  # Clear cache on startup to ensure fresh data
     database.init_db()
     print("Database initialized, ready for requests")
     
@@ -490,7 +491,13 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         # Get user's personal watchlist
         user_watchlist = database.get_personal_watchlist(user_id=user_id)
         if not user_watchlist:
-            user_watchlist = signals.WATCHLIST
+            return {
+                'gainers': [],
+                'losers': [],
+                'all_predictions': [],
+                'count': 0,
+                'message': 'Your watchlist is empty. Add stocks to see predictions.'
+            }
         
         # Use user-specific cache key so each user gets their own predictions
         watchlist_key = ",".join(sorted(user_watchlist))
@@ -500,9 +507,14 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
         if cached_signals:
             sorted_signals = sorted(cached_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
             all_predictions = convert_signals_to_predictions(sorted_signals)
+            
+            # Separate gainers (positive change) and losers (negative change)
+            gainers = [p for p in all_predictions if p.get('percent_change', 0) > 0][:3]
+            losers = [p for p in all_predictions if p.get('percent_change', 0) < 0][-3:]
+            
             predictions = {
-                'gainers': all_predictions[:3],
-                'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
+                'gainers': gainers,
+                'losers': losers,
                 'all_predictions': all_predictions,
                 'count': len(all_predictions)
             }
@@ -538,8 +550,8 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
                         )
                     
                     predictions = {
-                        'gainers': all_predictions[:3],
-                        'losers': all_predictions[-3:] if len(all_predictions) >= 3 else all_predictions,
+                        'gainers': [p for p in all_predictions if p.get('percent_change', 0) > 0][:3],
+                        'losers': [p for p in all_predictions if p.get('percent_change', 0) < 0][-3:],
                         'all_predictions': all_predictions,
                         'count': len(all_predictions)
                     }
@@ -906,9 +918,148 @@ def get_budget(authorization: str = Header(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Curated stock list for budget recommendations
+CURATED_STOCKS = [
+    # Major ETFs
+    'SPY', 'QQQ', 'VTI', 'VOO', 'IWM', 'GLD', 'TLT',
+    # Popular blue-chip stocks
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
+    'BRK.B', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA',
+    # Sector ETFs
+    'XLK', 'XLF', 'XLV', 'XLE', 'XLI', 'XLU', 'XLRE',
+]
+
+def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: List[str]) -> Dict[str, Any]:
+    """Get AI-powered stock allocation based on goal and time horizon"""
+    try:
+        # Get signals for the stock pool
+        all_signals = signals.get_all_signals(watchlist=stock_pool)
+        pool_signals = all_signals
+        
+        if not pool_signals:
+            return {
+                "total_budget": budget,
+                "total_allocated": 0.0,
+                "remaining_budget": budget,
+                "recommendations": [],
+                "message": "No valid stocks found in the selected pool"
+            }
+        
+        # Determine risk profile based on time horizon
+        horizon_years = int(time_horizon)
+        if horizon_years <= 1:
+            # Short-term: Conservative - focus on stability
+            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Hold']]
+            risk_multiplier = 0.5
+        elif horizon_years <= 3:
+            # Medium-term: Balanced
+            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Strong Buy', 'Hold']]
+            risk_multiplier = 1.0
+        else:
+            # Long-term: Aggressive - focus on growth
+            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Strong Buy']]
+            risk_multiplier = 1.5
+        
+        # Sort by score (combination of signal strength and momentum)
+        def score_signal(s):
+            signal_score = {'Strong Buy': 3, 'Buy': 2, 'Hold': 1}.get(s.get('signal', 'Hold'), 0)
+            momentum = abs(s.get('percent_change', 0))
+            return (signal_score * risk_multiplier) + (momentum * 0.1)
+        
+        pool_signals.sort(key=score_signal, reverse=True)
+        
+        # Select top stocks (5-7 depending on pool size)
+        num_stocks = min(len(pool_signals), 7)
+        top_picks = pool_signals[:num_stocks]
+        
+        if not top_picks:
+            return {
+                "total_budget": budget,
+                "total_allocated": 0.0,
+                "remaining_budget": budget,
+                "recommendations": [],
+                "message": "No suitable stocks found for your criteria"
+            }
+        
+        # Calculate allocation percentages
+        scores = [score_signal(s) for s in top_picks]
+        total_score = sum(scores) or 1
+        
+        stock_recommendations = []
+        total_allocated = 0.0
+        
+        for i, signal in enumerate(top_picks):
+            score = scores[i]
+            allocation_pct = score / total_score
+            amount = budget * allocation_pct
+            
+            current_price = signal.get('current_price', 0)
+            shares = amount / current_price if current_price > 0 else 0
+            
+            # Generate factors based on goal and time horizon
+            factors = []
+            goal_lower = goal.lower()
+            if 'retirement' in goal_lower:
+                factors.append("Long-term growth focus")
+            elif 'house' in goal_lower or 'home' in goal_lower:
+                factors.append("Balanced growth/stability")
+            elif 'emergency' in goal_lower:
+                factors.append("Conservative allocation")
+            elif 'vacation' in goal_lower:
+                factors.append("Short-term focus")
+            elif 'car' in goal_lower:
+                factors.append("Medium-term focus")
+            elif 'education' in goal_lower:
+                factors.append("Long-term growth focus")
+            elif 'wealth' in goal_lower:
+                factors.append("Aggressive growth focus")
+            else:
+                factors.append(f"Goal: {goal}")
+            
+            factors.append(f"Time horizon: {time_horizon} years")
+            factors.append(f"Signal: {signal.get('signal')}")
+            factors.append(f"Momentum: {signal.get('percent_change', 0):.2f}%")
+            
+            stock_recommendations.append({
+                'ticker': signal.get('ticker'),
+                'prediction': signal.get('signal'),
+                'current_price': current_price,
+                'shares': shares,
+                'actual_amount': amount,
+                'allocation_percentage': allocation_pct * 100,
+                'confidence': min(score_signal(signal) * 15 + 50, 95),
+                'score': score,
+                'potential_change': signal.get('percent_change', 0),
+                'factors': factors
+            })
+            total_allocated += amount
+        
+        return {
+            "total_budget": budget,
+            "total_allocated": total_allocated,
+            "remaining_budget": budget - total_allocated,
+            "recommendations": stock_recommendations,
+            "message": f"Based on your goal '{goal}' and {time_horizon}-year horizon, here are {len(stock_recommendations)} recommendations"
+        }
+    except Exception as e:
+        print(f"Error in get_ai_allocation: {e}")
+        return {
+            "total_budget": budget,
+            "total_allocated": 0.0,
+            "remaining_budget": budget,
+            "recommendations": [],
+            "message": f"Error generating recommendations: {str(e)}"
+        }
+
 @app.get("/budget-recommendations")
-def get_budget_recommendations(authorization: str = Header(...)):
-    """Get budget recommendations with stock allocations - fast version using daily signals"""
+def get_budget_recommendations(
+    stock_source: str = 'watchlist',
+    goal: str = '',
+    time_horizon: str = '5',
+    custom_stocks: str = '',
+    authorization: str = Header(...)
+):
+    """Get budget recommendations with AI-powered stock allocations"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
@@ -923,63 +1074,43 @@ def get_budget_recommendations(authorization: str = Header(...)):
                 "message": "Please set a budget to get recommendations"
             }
         
-        # Use fast signals for all 30+ stocks (no rate limiting)
-        all_signals = signals.get_all_signals()
+        # Determine stock pool based on source
+        stock_pool = []
+        if stock_source == 'watchlist':
+            watchlist = database.get_personal_watchlist(user_id=user_id)
+            print(f"DEBUG: User {user_id} watchlist: {watchlist}")
+            if not watchlist:
+                return {
+                    "total_budget": budget,
+                    "total_allocated": 0.0,
+                    "remaining_budget": budget,
+                    "recommendations": [],
+                    "message": "Your watchlist is empty. Please add stocks to your watchlist or use the Curated List option."
+                }
+            stock_pool = watchlist
+        elif stock_source == 'curated':
+            stock_pool = CURATED_STOCKS
+        elif stock_source == 'custom':
+            stock_pool = [s.strip().upper() for s in custom_stocks.split(',') if s.strip()]
         
-        # Filter for Buy/Strong Buy signals only
-        buy_signals = [s for s in all_signals if s.get('signal') in ['Buy', 'Strong Buy']]
-        
-        # Sort by percent change (highest momentum first)
-        buy_signals.sort(key=lambda x: x.get('percent_change', 0), reverse=True)
-        
-        # Calculate allocations
-        top_picks = buy_signals[:5]  # Top 5 picks
-        if not top_picks:
+        if not stock_pool:
             return {
                 "total_budget": budget,
                 "total_allocated": 0.0,
                 "remaining_budget": budget,
                 "recommendations": [],
-                "message": "No Buy/Strong Buy stocks found. Check back later when market conditions improve."
+                "message": "No stocks available for recommendations"
             }
         
-        # Use absolute percent change as score so allocations always sum to 100%
-        scores = [max(abs(s.get('percent_change', 1)), 0.01) for s in top_picks]
-        total_score = sum(scores) or 1
+        # Get AI-powered allocation
+        allocation = get_ai_allocation(
+            budget=budget,
+            goal=goal,
+            time_horizon=time_horizon,
+            stock_pool=stock_pool
+        )
         
-        stock_recommendations = []
-        total_allocated = 0.0
-        
-        for i, signal in enumerate(top_picks):
-            score = scores[i]
-            allocation_pct = score / total_score
-            amount = budget * allocation_pct
-            
-            current_price = signal.get('current_price', 0)
-            shares = amount / current_price if current_price > 0 else 0
-            
-            stock_recommendations.append({
-                'ticker': signal.get('ticker'),
-                'prediction': signal.get('signal'),  # Buy or Strong Buy
-                'current_price': current_price,
-                'shares': shares,
-                'actual_amount': amount,
-                'allocation_percentage': allocation_pct * 100,
-                'confidence': min(abs(signal.get('percent_change', 0)) * 10 + 50, 95),  # Higher confidence for bigger moves
-                'score': score,
-                'potential_change': signal.get('percent_change', 0),
-                'factors': [f"Daily momentum: {signal.get('percent_change', 0):.2f}%",
-                           f"Price: {current_price:.2f} USD"]
-            })
-            total_allocated += amount
-        
-        return {
-            "total_budget": budget,
-            "total_allocated": total_allocated,
-            "remaining_budget": budget - total_allocated,
-            "recommendations": stock_recommendations,
-            "message": f"Here are {len(stock_recommendations)} top momentum picks for your budget"
-        }
+        return allocation
     except HTTPException:
         raise
     except Exception as e:

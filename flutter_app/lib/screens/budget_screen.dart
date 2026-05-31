@@ -12,10 +12,14 @@ class BudgetScreen extends StatefulWidget {
 
 class _BudgetScreenState extends State<BudgetScreen> {
   final TextEditingController _budgetController = TextEditingController();
+  final TextEditingController _customStocksController = TextEditingController();
   double _currentBudget = 0.0;
   Map<String, dynamic>? _recommendations;
   bool _isLoading = false;
   String? _errorMessage;
+  String _stockSource = 'watchlist'; // watchlist, curated, custom
+  String _goal = 'Retirement'; // Investment goal
+  String _timeHorizon = '5'; // years
   // Snapshot of currency at the time recommendations were fetched
   String _snapCurrency = 'USD';
   String _snapSymbol = '\$';
@@ -65,6 +69,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return;
     }
 
+    if (_stockSource == 'custom' && _customStocksController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter custom stock tickers';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -76,7 +87,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
       final amountUsd = CurrencyService.toUsd(amount);
       await ApiService.setBudget(amountUsd);
       await _loadBudget();
-      await _getRecommendations();
+      
+      // Get custom stocks if selected
+      List<String> customStocks = [];
+      if (_stockSource == 'custom') {
+        customStocks = _customStocksController.text
+            .split(',')
+            .map((s) => s.trim().toUpperCase())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      
+      await _getRecommendations(customStocks);
       // Snapshot currency state for display
       setState(() {
         _snapCurrency = CurrencyService.currency;
@@ -92,14 +114,19 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
   }
 
-  Future<void> _getRecommendations() async {
+  Future<void> _getRecommendations(List<String> customStocks) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final recommendations = await ApiService.getBudgetRecommendations();
+      final recommendations = await ApiService.getBudgetRecommendations(
+        stockSource: _stockSource,
+        goal: _goal,
+        timeHorizon: _timeHorizon,
+        customStocks: customStocks,
+      );
       await CurrencyService.load();
       setState(() {
         _recommendations = recommendations;
@@ -136,7 +163,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Weekly Investment Budget',
+                        'Investment Budget',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -162,13 +189,82 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         controller: _budgetController,
                         keyboardType: TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
-                          labelText: 'Enter weekly budget (${CurrencyService.currency})',
+                          labelText: 'Budget amount (${CurrencyService.currency})',
                           border: const OutlineInputBorder(),
                           prefixText: '${CurrencyService.symbol} ',
-                          suffixText: CurrencyService.currency,
                           hintText: 'e.g. 100',
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _goal,
+                        decoration: const InputDecoration(
+                          labelText: 'Investment goal',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'Retirement', child: Text('Retirement')),
+                          DropdownMenuItem(value: 'House', child: Text('House / Home')),
+                          DropdownMenuItem(value: 'Emergency Fund', child: Text('Emergency Fund')),
+                          DropdownMenuItem(value: 'Vacation', child: Text('Vacation')),
+                          DropdownMenuItem(value: 'New Car', child: Text('New Car')),
+                          DropdownMenuItem(value: 'Education', child: Text('Education')),
+                          DropdownMenuItem(value: 'Wealth Building', child: Text('Wealth Building')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _goal = value!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _stockSource,
+                        decoration: const InputDecoration(
+                          labelText: 'Stock source',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'watchlist', child: Text('My Watchlist')),
+                          DropdownMenuItem(value: 'curated', child: Text('Curated List')),
+                          DropdownMenuItem(value: 'custom', child: Text('Custom Stocks')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _stockSource = value!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _timeHorizon,
+                        decoration: const InputDecoration(
+                          labelText: 'Time horizon',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: '1', child: Text('1 year (short-term)')),
+                          DropdownMenuItem(value: '3', child: Text('3 years (medium-term)')),
+                          DropdownMenuItem(value: '5', child: Text('5 years (medium-term)')),
+                          DropdownMenuItem(value: '10', child: Text('10+ years (long-term)')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _timeHorizon = value!;
+                          });
+                        },
+                      ),
+                      if (_stockSource == 'custom') ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _customStocksController,
+                          decoration: const InputDecoration(
+                            labelText: 'Custom stocks (comma-separated)',
+                            border: OutlineInputBorder(),
+                            hintText: 'e.g. AAPL, MSFT, GOOGL',
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
@@ -176,7 +272,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           onPressed: _isLoading ? null : _setBudget,
                           child: _isLoading
                               ? const CircularProgressIndicator()
-                              : const Text('Set Budget & Get Recommendations'),
+                              : const Text('Get Recommendations'),
                         ),
                       ),
                     ],
@@ -346,6 +442,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   @override
   void dispose() {
     _budgetController.dispose();
+    _customStocksController.dispose();
     super.dispose();
   }
 }

@@ -114,22 +114,6 @@ def init_db():
         if 'verification_tokens' not in inspector.get_table_names():
             VerificationToken.__table__.create(bind=engine)
             print("verification_tokens table created")
-        
-        # Ensure default stocks are in personal watchlist
-        session = SessionLocal()
-        try:
-            # Check if personal watchlist is empty
-            count = session.query(PersonalWatchlist).count()
-            if count == 0:
-                # Add default stocks
-                default_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
-                for ticker in default_stocks:
-                    stock = PersonalWatchlist(ticker=ticker)
-                    session.add(stock)
-                session.commit()
-                print("Ensured 5 default stocks are in personal watchlist")
-        finally:
-            session.close()
             
     except Exception as e:
         print(f"Error initializing database: {e}")
@@ -392,9 +376,7 @@ def get_personal_watchlist(user_id: int = None) -> List[str]:
     try:
         query = session.query(PersonalWatchlist.ticker).distinct()
         if user_id:
-            query = query.filter(
-                (PersonalWatchlist.user_id == user_id) | (PersonalWatchlist.user_id.is_(None))
-            )
+            query = query.filter(PersonalWatchlist.user_id == user_id)
         result = query.all()
         return [ticker for (ticker,) in result]
     finally:

@@ -351,9 +351,22 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getBudgetRecommendations() async {
+  static Future<Map<String, dynamic>> getBudgetRecommendations({
+    String stockSource = 'watchlist',
+    String goal = '',
+    String timeHorizon = '5',
+    List<String> customStocks = const [],
+  }) async {
     final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl/budget-recommendations'), headers: headers);
+    final queryParams = {
+      'stock_source': stockSource,
+      'goal': goal,
+      'time_horizon': timeHorizon,
+      if (customStocks.isNotEmpty) 'custom_stocks': customStocks.join(','),
+    };
+    final uri = Uri.parse('$baseUrl/budget-recommendations')
+        .replace(queryParameters: queryParams);
+    final response = await http.get(uri, headers: headers);
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {

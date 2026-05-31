@@ -273,7 +273,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
     for attempt in range(max_retries):
         try:
             _yfinance_delay()  # Enforce rate limiting
-            stock = yf.Ticker(ticker, session=_yf_session)
+            stock = yf.Ticker(ticker)
             df = stock.history(period=period)
             if df.empty:
                 return None
@@ -891,7 +891,7 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
     for attempt in range(max_retries):
         try:
             _yfinance_delay()  # Enforce global rate limiting
-            stock = yf.Ticker(ticker, session=_yf_session)
+            stock = yf.Ticker(ticker)
             info = stock.info
             
             if not info:
@@ -1230,16 +1230,14 @@ def get_all_predictions(category: Optional[str] = None, limit: int = 5, watchlis
         try:
             import database
             personal_watchlist = database.get_personal_watchlist()
-            default_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
             
-            # Combine both watchlists and remove duplicates
-            combined_watchlist = list(set(personal_watchlist + default_watchlist))
-            target_watchlist = combined_watchlist if combined_watchlist else default_watchlist
+            # Only use personal watchlist, no fallback to default
+            target_watchlist = personal_watchlist if personal_watchlist else []
             
-            print(f"Using combined watchlist with {len(target_watchlist)} stocks (personal: {len(personal_watchlist)}, default: {len(default_watchlist)})")
+            print(f"Using personal watchlist with {len(target_watchlist)} stocks")
         except Exception as e:
-            print(f"Error fetching personal watchlist, using default: {e}")
-            target_watchlist = CATEGORIES.get(category, WATCHLIST) if category else WATCHLIST
+            print(f"Error fetching personal watchlist: {e}")
+            target_watchlist = []
     
     predictions = []
     
