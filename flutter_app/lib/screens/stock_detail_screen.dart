@@ -469,61 +469,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     );
   }
 
-  Widget _buildIndicatorsCard() {
-    final indicators = widget.signal.indicators!;
-    return Card(
-      color: Colors.blue.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Technical Indicators',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildIndicatorRow('Daily % Change', '${indicators['daily_percent_change']?.toStringAsFixed(2)}%'),
-            _buildIndicatorRow('Price vs Open', '${indicators['price_vs_open']?.toStringAsFixed(2)}%'),
-            _buildIndicatorRow('Price vs Prev Close', '${indicators['price_vs_previous_close']?.toStringAsFixed(2)}%'),
-            _buildIndicatorRow('Position in Range', '${indicators['position_in_daily_range']?.toStringAsFixed(1)}%'),
-            _buildIndicatorRow('MA50 Position', '${indicators['ma50_position']?.toStringAsFixed(2)}%'),
-            _buildIndicatorRow('MA200 Position', '${indicators['ma200_position']?.toStringAsFixed(2)}%'),
-            if (indicators['golden_death_cross'] != null)
-              _buildIndicatorRow('Golden/Death Cross', indicators['golden_death_cross']),
-            if (indicators['volume_confirmation'] != null)
-              _buildIndicatorRow('Volume', indicators['volume_confirmation']),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIndicatorRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  
   Widget _buildSignalCard() {
     return Card(
       child: Padding(
@@ -783,8 +729,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 spacing: 16,
                 children: [
                   _buildLegendItem(Colors.blue, 'Price', _showPrice, () => setState(() => _showPrice = !_showPrice)),
-                  if (hasMA50) _buildLegendItem(Colors.orange, 'MA50', _showMA50, () => setState(() => _showMA50 = !_showMA50)),
-                  if (hasMA200) _buildLegendItem(Colors.red, 'MA200', _showMA200, () => setState(() => _showMA200 = !_showMA200)),
+                  if (hasMA50) _buildLegendItem(Colors.orange, 'MA200', _showMA50, () => setState(() => _showMA50 = !_showMA50)),
+                  if (hasMA200) _buildLegendItem(Colors.red, 'MA50', _showMA200, () => setState(() => _showMA200 = !_showMA200)),
                   if (hasProjection) _buildLegendItem(Colors.purple, 'AI Forecast', _showPrediction, () => setState(() => _showPrediction = !_showPrediction)),
                   if (_predictionHistory.isNotEmpty) _buildAccuracyLegend(),
                 ],
