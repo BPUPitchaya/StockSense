@@ -557,8 +557,6 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             if (widget.signal.rsi != null)
               Text('RSI: ${widget.signal.rsi!.toStringAsFixed(2)}'),
             const SizedBox(height: 16),
-            if (widget.signal.indicators != null) _buildIndicatorsCard(),
-            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -721,7 +719,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         LineChartBarData(
           spots: ma200Spots,
           isCurved: true,
-          color: Colors.orange,
+          color: Colors.red,
           barWidth: 1.5,
           dotData: FlDotData(show: false),
           dashArray: [6, 4],
@@ -730,7 +728,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         LineChartBarData(
           spots: ma50Spots,
           isCurved: true,
-          color: Colors.red,
+          color: Colors.orange,
           barWidth: 1.5,
           dotData: FlDotData(show: false),
           dashArray: [6, 4],
@@ -785,8 +783,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 spacing: 16,
                 children: [
                   _buildLegendItem(Colors.blue, 'Price', _showPrice, () => setState(() => _showPrice = !_showPrice)),
-                  if (hasMA50) _buildLegendItem(Colors.red, 'MA50', _showMA50, () => setState(() => _showMA50 = !_showMA50)),
-                  if (hasMA200) _buildLegendItem(Colors.orange, 'MA200', _showMA200, () => setState(() => _showMA200 = !_showMA200)),
+                  if (hasMA50) _buildLegendItem(Colors.orange, 'MA50', _showMA50, () => setState(() => _showMA50 = !_showMA50)),
+                  if (hasMA200) _buildLegendItem(Colors.red, 'MA200', _showMA200, () => setState(() => _showMA200 = !_showMA200)),
                   if (hasProjection) _buildLegendItem(Colors.purple, 'AI Forecast', _showPrediction, () => setState(() => _showPrediction = !_showPrediction)),
                   if (_predictionHistory.isNotEmpty) _buildAccuracyLegend(),
                 ],
@@ -852,7 +850,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   lineTouchData: LineTouchData(
                     touchTooltipData: LineTouchTooltipData(
                       getTooltipItems: (spots) => spots.map((s) {
-                        final colors = [Colors.blue, Colors.red, Colors.orange];
+                        final colors = [Colors.blue, Colors.orange, Colors.red];
                         final labels = ['Price', 'MA50', 'MA200'];
                         final idx = s.barIndex.clamp(0, 2);
                         return LineTooltipItem(
