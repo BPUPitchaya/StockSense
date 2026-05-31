@@ -12,6 +12,7 @@ class Signal {
   final double? premarketPrice;
   final double? premarketChange;
   final double? premarketPercentChange;
+  final Map<String, dynamic>? indicators;
 
   Signal({
     required this.ticker,
@@ -27,6 +28,7 @@ class Signal {
     this.premarketPrice,
     this.premarketChange,
     this.premarketPercentChange,
+    this.indicators,
   });
 
   factory Signal.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class Signal {
       premarketPrice: json['premarket_price']?.toDouble(),
       premarketChange: json['premarket_change']?.toDouble(),
       premarketPercentChange: json['premarket_percent_change']?.toDouble(),
+      indicators: json['indicators'] as Map<String, dynamic>?,
     );
   }
 }

@@ -639,6 +639,35 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
                     return bool(val)
                 return val
             
+            # Calculate additional indicators
+            price_vs_open = ((current_price - open_price) / open_price * 100) if open_price and current_price else 0
+            price_vs_prev_close = ((current_price - previous_close) / previous_close * 100) if previous_close and current_price else 0
+            position_in_range = ((current_price - low) / (high - low) * 100) if high and low and high > low else 50
+            ma50_position = ((current_price - ma50) / ma50 * 100) if ma50 and current_price else 0
+            ma200_position = ((current_price - ma200) / ma200 * 100) if ma200 and current_price else 0
+            
+            # Determine golden/death cross
+            cross_status = None
+            if ma50 and ma200:
+                if ma50 > ma200 * 1.01:
+                    cross_status = "Golden Cross"
+                elif ma50 < ma200 * 0.99:
+                    cross_status = "Death Cross"
+                else:
+                    cross_status = "Neutral"
+            
+            # Determine volume confirmation
+            volume_status = None
+            if volume_ratio:
+                if volume_ratio > 2.0:
+                    volume_status = "High"
+                elif volume_ratio > 1.5:
+                    volume_status = "Above Average"
+                elif volume_ratio < 0.5:
+                    volume_status = "Low"
+                else:
+                    volume_status = "Normal"
+            
             result = {
                 'ticker': ticker,
                 'name': stock_info.get('name'),  # Company full name
@@ -666,6 +695,16 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
                 'industry': stock_info.get('industry'),
                 'sector': stock_info.get('sector'),
                 'description': stock_info.get('description'),
+                'indicators': {
+                    'daily_percent_change': to_native(percent_change),
+                    'price_vs_open': to_native(price_vs_open),
+                    'price_vs_previous_close': to_native(price_vs_prev_close),
+                    'position_in_daily_range': to_native(position_in_range),
+                    'ma50_position': to_native(ma50_position),
+                    'ma200_position': to_native(ma200_position),
+                    'golden_death_cross': cross_status,
+                    'volume_confirmation': volume_status,
+                }
             }
             signals.append(result)
         # No delay needed for Finnhub
