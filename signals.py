@@ -640,30 +640,34 @@ def get_all_signals(watchlist: Optional[List[str]] = None) -> List[Dict]:
                 return val
             
             # Calculate additional indicators
+            ma50_val = technicals.get('ma50')
+            ma200_val = technicals.get('ma200')
+            volume_ratio_val = technicals.get('volume_ratio')
+            
             price_vs_open = ((current_price - open_price) / open_price * 100) if open_price and current_price else 0
             price_vs_prev_close = ((current_price - previous_close) / previous_close * 100) if previous_close and current_price else 0
             position_in_range = ((current_price - low) / (high - low) * 100) if high and low and high > low else 50
-            ma50_position = ((current_price - ma50) / ma50 * 100) if ma50 and current_price else 0
-            ma200_position = ((current_price - ma200) / ma200 * 100) if ma200 and current_price else 0
+            ma50_position = ((current_price - ma50_val) / ma50_val * 100) if ma50_val and current_price else 0
+            ma200_position = ((current_price - ma200_val) / ma200_val * 100) if ma200_val and current_price else 0
             
             # Determine golden/death cross
             cross_status = None
-            if ma50 and ma200:
-                if ma50 > ma200 * 1.01:
+            if ma50_val and ma200_val:
+                if ma50_val > ma200_val * 1.01:
                     cross_status = "Golden Cross"
-                elif ma50 < ma200 * 0.99:
+                elif ma50_val < ma200_val * 0.99:
                     cross_status = "Death Cross"
                 else:
                     cross_status = "Neutral"
             
             # Determine volume confirmation
             volume_status = None
-            if volume_ratio:
-                if volume_ratio > 2.0:
+            if volume_ratio_val:
+                if volume_ratio_val > 2.0:
                     volume_status = "High"
-                elif volume_ratio > 1.5:
+                elif volume_ratio_val > 1.5:
                     volume_status = "Above Average"
-                elif volume_ratio < 0.5:
+                elif volume_ratio_val < 0.5:
                     volume_status = "Low"
                 else:
                     volume_status = "Normal"
