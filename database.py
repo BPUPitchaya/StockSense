@@ -83,6 +83,18 @@ class NotificationPreference(Base):
     admin_announcements_enabled = Column(Boolean, default=True)
     email_notifications_enabled = Column(Boolean, default=False)  # Disabled until custom domain
 
+class StockPriceAlert(Base):
+    __tablename__ = 'stock_price_alerts'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    ticker = Column(String, nullable=False)
+    target_price = Column(Float, nullable=False)
+    condition = Column(String, nullable=False)  # 'above' or 'below'
+    is_active = Column(Boolean, default=True)
+    is_triggered = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    triggered_at = Column(DateTime, nullable=True)
+
 class PredictionHistory(Base):
     __tablename__ = 'prediction_history'
     id = Column(Integer, primary_key=True)
@@ -1136,5 +1148,131 @@ def update_notification_preferences(user_id: int, preferences: dict) -> bool:
         print(f"Error updating notification preferences: {e}")
         session.rollback()
         return False
+    finally:
+        session.close()
+
+# Stock price alert functions
+def create_stock_price_alert(user_id: int, ticker: str, target_price: float, condition: str) -> bool:
+    """Create a stock price alert for a user"""
+    session = SessionLocal()
+    try:
+        alert = StockPriceAlert(
+            user_id=user_id,
+            ticker=ticker.upper(),
+            target_price=target_price,
+            condition=condition.lower()  # 'above' or 'below'
+        )
+        session.add(alert)
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating stock price alert: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_user_stock_alerts(user_id: int) -> list:
+    """Get all stock price alerts for a user"""
+    session = SessionLocal()
+    try:
+        alerts = session.query(StockPriceAlert).filter(
+            StockPriceAlert.user_id == user_id
+        ).order_by(StockPriceAlert.created_at.desc()).all()
+        return [
+            {
+                'id': a.id,
+                'ticker': a.ticker,
+                'target_price': a.target_price,
+                'condition': a.condition,
+                'is_active': a.is_active,
+                'is_triggered': a.is_triggered,
+                'created_at': a.created_at.isoformat() if a.created_at else None,
+                'triggered_at': a.triggered_at.isoformat() if a.triggered_at else None
+            }
+            for a in alerts
+        ]
+    except Exception as e:
+        print(f"Error getting stock alerts: {e}")
+        return []
+    finally:
+        session.close()
+
+def delete_stock_alert(alert_id: int, user_id: int) -> bool:
+    """Delete a stock price alert"""
+    session = SessionLocal()
+    try:
+        alert = session.query(StockPriceAlert).filter(
+            StockPriceAlert.id == alert_id,
+            StockPriceAlert.user_id == user_id
+        ).first()
+        if alert:
+            session.delete(alert)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error deleting stock alert: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def check_and_trigger_price_alerts() -> int:
+    """Check all active price alerts and trigger if condition is met"""
+    import signals
+    session = SessionLocal()
+    triggered_count = 0
+    
+    try:
+        # Get all active, untriggered alerts
+        alerts = session.query(StockPriceAlert).filter(
+            StockPriceAlert.is_active == True,
+            StockPriceAlert.is_triggered == False
+        ).all()
+        
+        for alert in alerts:
+            try:
+                # Get current stock price
+                stock_info = signals.get_stock_info_finnhub(alert.ticker)
+                if not stock_info or 'current_price' not in stock_info:
+                    continue
+                
+                current_price = stock_info['current_price']
+                triggered = False
+                
+                # Check condition
+                if alert.condition == 'above' and current_price >= alert.target_price:
+                    triggered = True
+                elif alert.condition == 'below' and current_price <= alert.target_price:
+                    triggered = True
+                
+                if triggered:
+                    # Mark alert as triggered
+                    alert.is_triggered = True
+                    alert.triggered_at = datetime.utcnow()
+                    
+                    # Create notification for user
+                    create_notification(
+                        user_id=alert.user_id,
+                        notification_type='stock_alert',
+                        title=f'Price Alert: {alert.ticker}',
+                        message=f'{alert.ticker} is now ${current_price:.2f} (target: ${alert.target_price:.2f})',
+                        ticker=alert.ticker,
+                        target_price=alert.target_price,
+                        current_price=current_price
+                    )
+                    
+                    triggered_count += 1
+            except Exception as e:
+                print(f"Error checking alert {alert.id}: {e}")
+                continue
+        
+        session.commit()
+        return triggered_count
+    except Exception as e:
+        print(f"Error checking price alerts: {e}")
+        session.rollback()
+        return 0
     finally:
         session.close()

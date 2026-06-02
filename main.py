@@ -188,6 +188,11 @@ class AnnouncementRequest(BaseModel):
     title: str
     message: str
 
+class StockAlertRequest(BaseModel):
+    ticker: str
+    target_price: float
+    condition: str  # 'above' or 'below'
+
 class Position(BaseModel):
     ticker: str
     buy_price: float
@@ -255,6 +260,18 @@ def refresh_cache_async(key: str, refresh_func, *args, **kwargs):
     
     _refresh_executor.submit(_refresh)
 
+def check_price_alerts_async():
+    """Check price alerts in background"""
+    def _check():
+        try:
+            triggered_count = database.check_and_trigger_price_alerts()
+            if triggered_count > 0:
+                print(f"Price alert check completed: {triggered_count} alerts triggered")
+        except Exception as e:
+            print(f"Price alert check failed: {e}")
+    
+    _refresh_executor.submit(_check)
+
 @app.on_event("startup")
 def startup_event():
     """Initialize database and clear cache - cache warms on first request"""
@@ -278,6 +295,22 @@ def startup_event():
                     print(f"  Error checking {pred.get('ticker')}: {e}")
     except Exception as e:
         print(f"Error checking prediction accuracy: {e}")
+    
+    # Start periodic price alert checking (every 5 minutes)
+    import threading
+    import time
+    def periodic_price_alert_check():
+        while True:
+            try:
+                check_price_alerts_async()
+                time.sleep(300)  # Check every 5 minutes
+            except Exception as e:
+                print(f"Periodic price alert check error: {e}")
+                time.sleep(300)
+    
+    alert_thread = threading.Thread(target=periodic_price_alert_check, daemon=True)
+    alert_thread.start()
+    print("Periodic price alert checking started (every 5 minutes)")
 
 @app.get("/")
 def read_root():
@@ -1729,6 +1762,84 @@ def send_announcement(request: Request, announcement: AnnouncementRequest, autho
                 )
         
         return {"message": f"Announcement sent to {len(users)} users"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Stock price alert endpoints
+@app.post("/stock-alerts")
+@limiter.limit("10/minute")
+def create_stock_alert(request: Request, alert_request: StockAlertRequest, authorization: str = Header(...)):
+    """Create a stock price alert"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        # Validate condition
+        if alert_request.condition.lower() not in ['above', 'below']:
+            raise HTTPException(status_code=400, detail="Condition must be 'above' or 'below'")
+        
+        # Validate target price
+        if alert_request.target_price <= 0:
+            raise HTTPException(status_code=400, detail="Target price must be positive")
+        
+        success = database.create_stock_price_alert(
+            user_id=user_id,
+            ticker=alert_request.ticker,
+            target_price=alert_request.target_price,
+            condition=alert_request.condition
+        )
+        
+        if success:
+            return {"message": "Stock alert created successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create stock alert")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/stock-alerts")
+@limiter.limit("30/minute")
+def get_stock_alerts(request: Request, authorization: str = Header(...)):
+    """Get user's stock price alerts"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        alerts = database.get_user_stock_alerts(user_id)
+        return {"alerts": alerts}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/stock-alerts/{alert_id}")
+@limiter.limit("20/minute")
+def delete_stock_alert(request: Request, alert_id: int, authorization: str = Header(...)):
+    """Delete a stock price alert"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.delete_stock_alert(alert_id, user_id)
+        if success:
+            return {"message": "Stock alert deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Alert not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/check-price-alerts")
+@limiter.limit("10/minute")
+def check_price_alerts(request: Request, authorization: str = Header(...)):
+    """Manually trigger price alert check (admin only)"""
+    try:
+        triggered_count = database.check_and_trigger_price_alerts()
+        return {"message": f"Checked price alerts, triggered {triggered_count} alerts"}
     except HTTPException:
         raise
     except Exception as e:
