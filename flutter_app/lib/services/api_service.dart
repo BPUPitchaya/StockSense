@@ -504,7 +504,7 @@ class ApiService {
   }
 
   // User profile methods
-  static Future<Map<String, dynamic>> getUserProfile() async {
+  static Future<Map<String, dynamic>> getCurrentUserProfile() async {
     final headers = await _getHeaders();
     final token = await _getToken();
     final response = await http.get(

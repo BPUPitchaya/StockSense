@@ -45,7 +45,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     });
 
     try {
-      final profile = await ApiService.getUserProfile();
+      final profile = await ApiService.getCurrentUserProfile();
       setState(() {
         _userProfile = profile;
         _firstNameController.text = profile['first_name'] ?? '';
