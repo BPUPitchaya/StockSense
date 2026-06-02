@@ -272,6 +272,28 @@ def startup_event():
 def read_root():
     return {"message": "StockSense API is running"}
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check database connection
+        session = SessionLocal()
+        session.execute("SELECT 1")
+        session.close()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @app.post("/signup")
 @limiter.limit("5/minute")
 def signup(request: Request, signup_request: SignupRequest):
