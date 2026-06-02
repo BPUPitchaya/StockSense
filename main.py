@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -274,11 +274,11 @@ def read_root():
 
 @app.post("/signup")
 @limiter.limit("5/minute")
-def signup(request: SignupRequest):
+def signup(request: Request, signup_request: SignupRequest):
     """User signup endpoint - email verification temporarily disabled"""
     try:
         # Password validation
-        password = request.password
+        password = signup_request.password
         if len(password) < 8:
             raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
         if not any(c.isupper() for c in password):
@@ -305,10 +305,10 @@ def signup(request: SignupRequest):
 
 @app.post("/login")
 @limiter.limit("10/minute")
-def login(request: LoginRequest):
+def login(request: Request, login_request: LoginRequest):
     """User login endpoint - email verification check temporarily disabled"""
     try:
-        user = database.verify_user(request.email, request.password)
+        user = database.verify_user(login_request.email, login_request.password)
         if user:
             # Email verification check temporarily disabled
             token = create_jwt_token({"sub": user['email'], "user_id": user['id']})
@@ -326,11 +326,11 @@ def login(request: LoginRequest):
 
 @app.post("/admin/login")
 @limiter.limit("10/minute")
-def admin_login(request: LoginRequest):
+def admin_login(request: Request, login_request: LoginRequest):
     """Admin login endpoint"""
     try:
-        if database.verify_admin(request.email, request.password):
-            return {"message": "Admin login successful", "email": request.email}
+        if database.verify_admin(login_request.email, login_request.password):
+            return {"message": "Admin login successful", "email": login_request.email}
         else:
             raise HTTPException(status_code=401, detail="Invalid admin credentials. Please check your email and password.")
     except HTTPException:
@@ -425,7 +425,7 @@ def get_all_users():
 
 @app.get("/admin/users/{user_id}")
 @limiter.limit("30/minute")
-def get_user_profile(user_id: int):
+def get_user_profile(request: Request, user_id: int):
     """Get detailed user profile (admin only)"""
     try:
         profile = database.get_user_profile(user_id)
@@ -468,7 +468,7 @@ def reset_user_password(user_id: int, request: dict):
 
 @app.delete("/admin/users/{user_id}")
 @limiter.limit("10/minute")
-def delete_user(user_id: int):
+def delete_user(request: Request, user_id: int):
     """Delete a user (admin only)"""
     try:
         success = database.delete_user(user_id)
@@ -525,7 +525,7 @@ def get_categories():
 
 @app.get("/signals")
 @limiter.limit("30/minute")
-def get_signals(category: Optional[str] = None, refresh: bool = False):
+def get_signals(request: Request, category: Optional[str] = None, refresh: bool = False):
     """Get trading signals - instant with stale-while-revalidate"""
     cache_key = get_cache_key("signals_5stocks", category=category or "all")
     
@@ -585,7 +585,7 @@ def get_signals(category: Optional[str] = None, refresh: bool = False):
 
 @app.get("/predictions")
 @limiter.limit("30/minute")
-def get_predictions(category: Optional[str] = None, authorization: str = Header(...)):
+def get_predictions(request: Request, category: Optional[str] = None, authorization: str = Header(...)):
     """Get predictions using same fast signals as main page for consistency"""
     try:
         payload = verify_jwt_token(authorization)
@@ -671,7 +671,7 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
 
 @app.get("/predictions/history/{ticker}")
 @limiter.limit("30/minute")
-def get_prediction_history_endpoint(ticker: str):
+def get_prediction_history_endpoint(request: Request, ticker: str):
     """Get historical predictions for a ticker to show accuracy"""
     try:
         history = database.get_prediction_history(ticker)
@@ -906,7 +906,7 @@ def get_projection(ticker: str, period: str = "1y"):
 
 @app.post("/portfolio")
 @limiter.limit("20/minute")
-def add_position(position: Position, authorization: str = Header(...)):
+def add_position(request: Request, position: Position, authorization: str = Header(...)):
     """Add a position to portfolio"""
     try:
         payload = verify_jwt_token(authorization)
@@ -927,7 +927,7 @@ def add_position(position: Position, authorization: str = Header(...)):
 
 @app.get("/portfolio")
 @limiter.limit("30/minute")
-def get_portfolio(authorization: str = Header(...)):
+def get_portfolio(request: Request, authorization: str = Header(...)):
     """Get portfolio positions"""
     try:
         payload = verify_jwt_token(authorization)
@@ -944,7 +944,7 @@ def get_portfolio(authorization: str = Header(...)):
 
 @app.delete("/portfolio/{position_id}")
 @limiter.limit("20/minute")
-def delete_position(position_id: int, authorization: str = Header(...)):
+def delete_position(request: Request, position_id: int, authorization: str = Header(...)):
     """Delete a position from portfolio"""
     try:
         payload = verify_jwt_token(authorization)
@@ -962,7 +962,7 @@ def delete_position(position_id: int, authorization: str = Header(...)):
 
 @app.post("/watchlist")
 @limiter.limit("20/minute")
-def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)):
+def add_to_watchlist(request: Request, watchlist_request: WatchlistRequest, authorization: str = Header(...)):
     """Add a stock to personal watchlist (also adds to prediction watchlist for tracking)"""
     try:
         payload = verify_jwt_token(authorization)
@@ -974,7 +974,7 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
         
         # Get current price for tracking
         try:
-            stock_info = signals.get_stock_info_finnhub(request.ticker)
+            stock_info = signals.get_stock_info_finnhub(watchlist_request.ticker)
             current_price = stock_info.get('current_price') if stock_info else None
             if not current_price:
                 raise HTTPException(status_code=400, detail="Could not get current price")
@@ -982,12 +982,12 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
             raise HTTPException(status_code=400, detail="Could not get current price")
         
         # Add to regular watchlist
-        success = database.add_to_watchlist(request.ticker, user_id=user_id)
+        success = database.add_to_watchlist(watchlist_request.ticker, user_id=user_id)
         if not success:
             raise HTTPException(status_code=400, detail="This stock is already in your watchlist.")
         
         # Also add to prediction watchlist for tracking
-        database.add_to_prediction_watchlist(request.ticker, current_price, user_id=user_id)
+        database.add_to_prediction_watchlist(watchlist_request.ticker, current_price, user_id=user_id)
         
         return {"message": "Stock added to watchlist"}
     except HTTPException:
@@ -1011,7 +1011,7 @@ def get_watchlist(authorization: str = Header(...)):
 
 @app.delete("/watchlist/{ticker}")
 @limiter.limit("20/minute")
-def remove_from_watchlist(ticker: str, authorization: str = Header(...)):
+def remove_from_watchlist(request: Request, ticker: str, authorization: str = Header(...)):
     """Remove a stock from personal watchlist (also removes from prediction watchlist)"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1035,13 +1035,13 @@ class PredictionWatchlistRequest(BaseModel):
 
 @app.post("/prediction-watchlist")
 @limiter.limit("20/minute")
-def add_to_prediction_watchlist(request: PredictionWatchlistRequest, authorization: str = Header(...)):
+def add_to_prediction_watchlist(request: Request, prediction_request: PredictionWatchlistRequest, authorization: str = Header(...)):
     """Add a stock to prediction watchlist"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        success = database.add_to_prediction_watchlist(request.ticker, request.added_price, user_id=user_id)
+        success = database.add_to_prediction_watchlist(prediction_request.ticker, prediction_request.added_price, user_id=user_id)
         if success:
             return {"message": "Stock added to prediction watchlist"}
         else:
@@ -1053,7 +1053,7 @@ def add_to_prediction_watchlist(request: PredictionWatchlistRequest, authorizati
 
 @app.get("/prediction-watchlist")
 @limiter.limit("30/minute")
-def get_prediction_watchlist(authorization: str = Header(...)):
+def get_prediction_watchlist(request: Request, authorization: str = Header(...)):
     """Get prediction watchlist with performance tracking"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1116,7 +1116,7 @@ def get_prediction_watchlist(authorization: str = Header(...)):
 
 @app.delete("/prediction-watchlist/{ticker}")
 @limiter.limit("20/minute")
-def remove_from_prediction_watchlist(ticker: str, authorization: str = Header(...)):
+def remove_from_prediction_watchlist(request: Request, ticker: str, authorization: str = Header(...)):
     """Remove a stock from prediction watchlist"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1447,7 +1447,7 @@ def get_supported_currencies():
 
 @app.get("/user/currency")
 @limiter.limit("30/minute")
-def get_user_currency(authorization: str = Header(...)):
+def get_user_currency(request: Request, authorization: str = Header(...)):
     """Get user's preferred currency"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1461,13 +1461,13 @@ def get_user_currency(authorization: str = Header(...)):
 
 @app.put("/user/profile")
 @limiter.limit("20/minute")
-def update_user_profile(request: ProfileUpdateRequest, authorization: str = Header(...)):
+def update_user_profile(request: Request, profile_request: ProfileUpdateRequest, authorization: str = Header(...)):
     """Update user profile information"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        success = database.update_user_profile(user_id, request.first_name, request.last_name)
+        success = database.update_user_profile(user_id, profile_request.first_name, profile_request.last_name)
         if success:
             return {"message": "Profile updated successfully"}
         else:
@@ -1479,7 +1479,7 @@ def update_user_profile(request: ProfileUpdateRequest, authorization: str = Head
 
 @app.get("/user/profile")
 @limiter.limit("30/minute")
-def get_user_profile_endpoint(authorization: str = Header(...)):
+def get_user_profile_endpoint(request: Request, authorization: str = Header(...)):
     """Get current user profile"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1501,7 +1501,7 @@ class PasswordChangeRequest(BaseModel):
 
 @app.post("/user/change-password")
 @limiter.limit("5/minute")
-def change_user_password(request: PasswordChangeRequest, authorization: str = Header(...)):
+def change_user_password(request: Request, password_request: PasswordChangeRequest, authorization: str = Header(...)):
     """Change user password"""
     try:
         payload = verify_jwt_token(authorization)
@@ -1513,11 +1513,11 @@ def change_user_password(request: PasswordChangeRequest, authorization: str = He
             raise HTTPException(status_code=404, detail="User not found")
         
         # Verify current password
-        if not database.verify_user(user['email'], request.current_password):
+        if not database.verify_user(user['email'], password_request.current_password):
             raise HTTPException(status_code=401, detail="Current password is incorrect")
         
         # Validate new password
-        new_password = request.new_password
+        new_password = password_request.new_password
         if len(new_password) < 8:
             raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
         if not any(c.isupper() for c in new_password):
