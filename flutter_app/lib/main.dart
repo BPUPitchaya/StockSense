@@ -5,6 +5,7 @@ import 'screens/portfolio_screen.dart';
 import 'screens/predictions_screen.dart';
 import 'screens/budget_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/prediction_watchlist_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/reset_password_screen.dart';
@@ -114,6 +115,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const SignalsScreen(),
     const PredictionsScreen(),
+    const PredictionWatchlistScreen(),
     const BudgetScreen(),
     const PortfolioScreen(),
     const SettingsScreen(),
@@ -138,6 +140,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Predictions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark),
+            label: 'Track',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.attach_money),

@@ -855,7 +855,7 @@ def delete_position(position_id: int, authorization: str = Header(...)):
 
 @app.post("/watchlist")
 def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)):
-    """Add a stock to personal watchlist"""
+    """Add a stock to personal watchlist (also adds to prediction watchlist for tracking)"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
@@ -863,11 +863,25 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
         current = database.get_personal_watchlist(user_id=user_id)
         if len(current) >= 5:
             raise HTTPException(status_code=400, detail="Watchlist limit reached (max 5 stocks)")
+        
+        # Get current price for tracking
+        try:
+            stock_info = signals.get_stock_info_finnhub(request.ticker)
+            current_price = stock_info.get('current_price') if stock_info else None
+            if not current_price:
+                raise HTTPException(status_code=400, detail="Could not get current price")
+        except:
+            raise HTTPException(status_code=400, detail="Could not get current price")
+        
+        # Add to regular watchlist
         success = database.add_to_watchlist(request.ticker, user_id=user_id)
-        if success:
-            return {"message": "Stock added to watchlist"}
-        else:
+        if not success:
             raise HTTPException(status_code=400, detail="Stock already in watchlist")
+        
+        # Also add to prediction watchlist for tracking
+        database.add_to_prediction_watchlist(request.ticker, current_price, user_id=user_id)
+        
+        return {"message": "Stock added to watchlist"}
     except HTTPException:
         raise
     except Exception as e:
@@ -889,16 +903,118 @@ def get_watchlist(authorization: str = Header(...)):
 
 @app.delete("/watchlist/{ticker}")
 def remove_from_watchlist(ticker: str, authorization: str = Header(...)):
-    """Remove a stock from personal watchlist"""
+    """Remove a stock from personal watchlist (also removes from prediction watchlist)"""
     try:
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
         success = database.remove_from_watchlist(ticker, user_id=user_id)
         if success:
+            # Also remove from prediction watchlist
+            database.remove_from_prediction_watchlist(ticker, user_id=user_id)
             return {"message": "Stock removed from watchlist"}
         else:
             raise HTTPException(status_code=404, detail="Stock not in watchlist")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PredictionWatchlistRequest(BaseModel):
+    ticker: str
+    added_price: float
+
+@app.post("/prediction-watchlist")
+def add_to_prediction_watchlist(request: PredictionWatchlistRequest, authorization: str = Header(...)):
+    """Add a stock to prediction watchlist"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.add_to_prediction_watchlist(request.ticker, request.added_price, user_id=user_id)
+        if success:
+            return {"message": "Stock added to prediction watchlist"}
+        else:
+            raise HTTPException(status_code=400, detail="Stock already in prediction watchlist")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/prediction-watchlist")
+def get_prediction_watchlist(authorization: str = Header(...)):
+    """Get prediction watchlist with performance tracking"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        # Get regular watchlist
+        regular_watchlist = database.get_personal_watchlist(user_id=user_id)
+        
+        # Get prediction watchlist
+        prediction_watchlist = database.get_prediction_watchlist(user_id=user_id)
+        prediction_tickers = {item['ticker'] for item in prediction_watchlist}
+        
+        # Migrate any stocks in regular watchlist that aren't in prediction watchlist
+        for ticker in regular_watchlist:
+            if ticker not in prediction_tickers:
+                try:
+                    stock_info = signals.get_stock_info_finnhub(ticker)
+                    current_price = stock_info.get('current_price') if stock_info else None
+                    if current_price:
+                        database.add_to_prediction_watchlist(ticker, current_price, user_id=user_id)
+                except:
+                    pass
+        
+        # Re-fetch prediction watchlist after migration
+        watchlist = database.get_prediction_watchlist(user_id=user_id)
+        
+        # Get current prices and calculate performance
+        result = []
+        for item in watchlist:
+            ticker = item['ticker']
+            added_price = item['added_price']
+            added_date = item['added_date']
+            
+            # Get current price
+            try:
+                stock_info = signals.get_stock_info_finnhub(ticker)
+                current_price = stock_info.get('current_price') if stock_info else None
+                
+                if current_price:
+                    percent_change = ((current_price - added_price) / added_price) * 100
+                else:
+                    percent_change = 0
+            except:
+                current_price = None
+                percent_change = 0
+            
+            result.append({
+                'ticker': ticker,
+                'added_date': added_date,
+                'added_price': added_price,
+                'current_price': current_price,
+                'percent_change': percent_change
+            })
+        
+        return {"watchlist": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/prediction-watchlist/{ticker}")
+def remove_from_prediction_watchlist(ticker: str, authorization: str = Header(...)):
+    """Remove a stock from prediction watchlist"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.remove_from_prediction_watchlist(ticker, user_id=user_id)
+        if success:
+            return {"message": "Stock removed from prediction watchlist"}
+        else:
+            raise HTTPException(status_code=404, detail="Stock not in prediction watchlist")
     except HTTPException:
         raise
     except Exception as e:

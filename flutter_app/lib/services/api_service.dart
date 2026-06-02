@@ -259,6 +259,46 @@ class ApiService {
     }
   }
 
+  // Prediction Watchlist
+  static Future<Map<String, dynamic>> getPredictionWatchlist() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/prediction-watchlist'),
+      headers: headers,
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get prediction watchlist: ${response.body}');
+    }
+  }
+
+  static Future<void> addToPredictionWatchlist(String ticker, double addedPrice) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/prediction-watchlist'),
+      headers: headers,
+      body: json.encode({'ticker': ticker, 'added_price': addedPrice}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add to prediction watchlist: ${response.body}');
+    }
+  }
+
+  static Future<void> removeFromPredictionWatchlist(String ticker) async {
+    final headers = await _getHeaders();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/prediction-watchlist/$ticker'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to remove from prediction watchlist: ${response.body}');
+    }
+  }
+
   // Additional methods for other screens
   static Future<Map<String, dynamic>> searchStock(String ticker) async {
     final response = await http.get(Uri.parse('$baseUrl/search/$ticker'));

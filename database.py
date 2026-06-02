@@ -70,6 +70,14 @@ class PredictionHistory(Base):
     accuracy_percent = Column(Float, nullable=True)  # Calculated when target_date reached
     is_correct = Column(Boolean, nullable=True)  # True if direction matched
 
+class PredictionWatchlist(Base):
+    __tablename__ = 'prediction_watchlist'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    ticker = Column(String, nullable=False)
+    added_date = Column(DateTime, default=datetime.utcnow)
+    added_price = Column(Float, nullable=False)
+
 def init_db():
     """Initialize the database"""
     try:
@@ -114,6 +122,11 @@ def init_db():
         if 'verification_tokens' not in inspector.get_table_names():
             VerificationToken.__table__.create(bind=engine)
             print("verification_tokens table created")
+        
+        # Create prediction_watchlist table if it doesn't exist
+        if 'prediction_watchlist' not in inspector.get_table_names():
+            PredictionWatchlist.__table__.create(bind=engine)
+            print("prediction_watchlist table created")
             
     except Exception as e:
         print(f"Error initializing database: {e}")
@@ -750,3 +763,62 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
     except Exception as e:
         print(f"Error sending email via SendGrid: {e}")
         return False
+
+def add_to_prediction_watchlist(ticker: str, added_price: float, user_id: int = None) -> bool:
+    """Add a stock to the prediction watchlist"""
+    session = SessionLocal()
+    try:
+        # Check if already in prediction watchlist
+        existing = session.query(PredictionWatchlist).filter(
+            PredictionWatchlist.ticker == ticker,
+            PredictionWatchlist.user_id == user_id
+        ).first()
+        if existing:
+            return False
+        
+        new_item = PredictionWatchlist(
+            ticker=ticker,
+            added_price=added_price,
+            user_id=user_id
+        )
+        session.add(new_item)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+def get_prediction_watchlist(user_id: int = None) -> List[Dict]:
+    """Get prediction watchlist for a user"""
+    session = SessionLocal()
+    try:
+        query = session.query(PredictionWatchlist)
+        if user_id:
+            query = query.filter(PredictionWatchlist.user_id == user_id)
+        items = query.all()
+        return [
+            {
+                'id': item.id,
+                'ticker': item.ticker,
+                'added_date': item.added_date.isoformat() if item.added_date else None,
+                'added_price': item.added_price
+            }
+            for item in items
+        ]
+    finally:
+        session.close()
+
+def remove_from_prediction_watchlist(ticker: str, user_id: int = None) -> bool:
+    """Remove a stock from the prediction watchlist"""
+    session = SessionLocal()
+    try:
+        item = session.query(PredictionWatchlist).filter(
+            PredictionWatchlist.ticker == ticker,
+            PredictionWatchlist.user_id == user_id
+        ).first()
+        if item:
+            session.delete(item)
+            session.commit()
+            return True
+        return False
+    finally:
+        session.close()
