@@ -134,6 +134,8 @@ def verify_jwt_token(authorization: str = Header(...)) -> dict:
 class SignupRequest(BaseModel):
     email: str
     password: str
+    first_name: str = None
+    last_name: str = None
 
 class LoginRequest(BaseModel):
     email: str
@@ -238,7 +240,23 @@ def read_root():
 def signup(request: SignupRequest):
     """User signup endpoint - email verification temporarily disabled"""
     try:
-        success = database.create_user(request.email, request.password)
+        # Password validation
+        password = request.password
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+        if not any(c.isupper() for c in password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+        
+        success = database.create_user(
+            request.email, 
+            request.password,
+            request.first_name,
+            request.last_name
+        )
         if success:
             return {"message": "User created successfully. You can now log in."}
         else:
@@ -363,6 +381,48 @@ def get_all_users():
     """Get all users (admin only)"""
     try:
         return database.get_all_users()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/users/{user_id}")
+def get_user_profile(user_id: int):
+    """Get detailed user profile (admin only)"""
+    try:
+        profile = database.get_user_profile(user_id)
+        if profile:
+            return profile
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/users/{user_id}/reset-password")
+def reset_user_password(user_id: int, request: dict):
+    """Reset user password (admin only)"""
+    try:
+        new_password = request.get("new_password")
+        if not new_password:
+            raise HTTPException(status_code=400, detail="new_password is required")
+        
+        # Password validation
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+        if not any(c.isupper() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+        
+        success = database.reset_user_password(user_id, new_password)
+        if success:
+            return {"message": "Password reset successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

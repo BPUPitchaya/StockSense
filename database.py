@@ -18,6 +18,8 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     preferred_currency = Column(String, default='USD')  # User's preferred currency
@@ -118,6 +120,22 @@ def init_db():
                 conn.commit()
             print("is_verified column added to users")
         
+        # Add first_name column to users if it doesn't exist
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'first_name' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN first_name VARCHAR"))
+                conn.commit()
+            print("first_name column added to users")
+        
+        # Add last_name column to users if it doesn't exist
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'last_name' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_name VARCHAR"))
+                conn.commit()
+            print("last_name column added to users")
+        
         # Create verification_tokens table if it doesn't exist
         if 'verification_tokens' not in inspector.get_table_names():
             VerificationToken.__table__.create(bind=engine)
@@ -135,7 +153,7 @@ def hash_password(password: str) -> str:
     """Hash a password using SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
-def create_user(email: str, password: str) -> bool:
+def create_user(email: str, password: str, first_name: str = None, last_name: str = None) -> bool:
     """Create a new user"""
     session = SessionLocal()
     try:
@@ -146,7 +164,12 @@ def create_user(email: str, password: str) -> bool:
         
         # Create new user
         password_hash = hash_password(password)
-        new_user = User(email=email, password_hash=password_hash)
+        new_user = User(
+            email=email, 
+            password_hash=password_hash,
+            first_name=first_name,
+            last_name=last_name
+        )
         session.add(new_user)
         session.commit()
         return True
@@ -190,11 +213,50 @@ def get_all_users() -> Dict:
                 {
                     'id': user.id,
                     'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
                     'created_at': user.created_at.isoformat() if user.created_at else None
                 }
                 for user in users
             ]
         }
+    finally:
+        session.close()
+
+def get_user_profile(user_id: int) -> Dict:
+    """Get detailed user profile (admin only)"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
+        return {
+            'id': user.id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'password_hash': user.password_hash,
+            'preferred_currency': user.preferred_currency,
+            'is_verified': user.is_verified,
+            'created_at': user.created_at.isoformat() if user.created_at else None
+        }
+    finally:
+        session.close()
+
+def reset_user_password(user_id: int, new_password: str) -> bool:
+    """Reset user password (admin only)"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return False
+        password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        user.password_hash = password_hash
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        raise e
     finally:
         session.close()
 
@@ -288,6 +350,8 @@ def get_recent_signups(limit: int = 5) -> List[Dict]:
             {
                 'id': user.id,
                 'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
                 'created_at': user.created_at.isoformat() if user.created_at else None
             }
             for user in recent_users

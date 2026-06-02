@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stockz_app/services/api_service.dart';
 import '../config.dart';
+import 'admin_user_profile_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -317,8 +318,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   child: Text(user['id']?.toString() ?? '?', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12)),
                 ),
-                title: Text(user['email'] ?? 'Unknown', overflow: TextOverflow.ellipsis),
-                subtitle: Text('Joined ${_formatDate(user['created_at'])}', style: const TextStyle(fontSize: 12)),
+                title: Text(_getFullName(user), overflow: TextOverflow.ellipsis),
+                subtitle: Text('${user['email'] ?? 'Unknown'} • Joined ${_formatDate(user['created_at'])}', style: const TextStyle(fontSize: 12)),
+                onTap: () => _navigateToUserProfile(user['id'], user['email']),
               ),
             )),
             const SizedBox(height: 16),
@@ -350,17 +352,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           backgroundColor: Colors.grey.shade200,
                           child: Text(user['id'].toString(), style: const TextStyle(fontSize: 12)),
                         ),
-                        title: Text(user['email'], overflow: TextOverflow.ellipsis),
-                        subtitle: Text('ID: ${user['id']}'),
+                        title: Text(_getFullName(user), overflow: TextOverflow.ellipsis),
+                        subtitle: Text(user['email'], overflow: TextOverflow.ellipsis),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.red),
                           onPressed: () => _deleteUser(user['id'], user['email']),
                         ),
+                        onTap: () => _navigateToUserProfile(user['id'], user['email']),
                       ),
                     );
                   },
                 ),
         ],
+      ),
+    );
+  }
+
+  String _getFullName(Map<String, dynamic> user) {
+    final firstName = user['first_name'] as String?;
+    final lastName = user['last_name'] as String?;
+    final fullName = '${firstName ?? ''} ${lastName ?? ''}'.trim();
+    return fullName.isNotEmpty ? fullName : user['email'] ?? 'Unknown';
+  }
+
+  void _navigateToUserProfile(int userId, String userEmail) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminUserProfileScreen(
+          userId: userId,
+          userEmail: userEmail,
+        ),
       ),
     );
   }

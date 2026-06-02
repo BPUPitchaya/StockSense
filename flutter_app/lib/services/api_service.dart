@@ -41,11 +41,22 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> signup(String email, String password) async {
+  static Future<Map<String, dynamic>> signup(String email, String password, {String? firstName, String? lastName}) async {
+    final body = {
+      'email': email,
+      'password': password,
+    };
+    if (firstName != null && firstName.isNotEmpty) {
+      body['first_name'] = firstName;
+    }
+    if (lastName != null && lastName.isNotEmpty) {
+      body['last_name'] = lastName;
+    }
+    
     final response = await http.post(
       Uri.parse('$baseUrl/signup'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'email': email, 'password': password}),
+      body: json.encode(body),
     );
 
     if (response.statusCode == 200) {
@@ -109,6 +120,28 @@ class ApiService {
       return json.decode(response.body);
     } else {
       throw Exception('Failed to get users: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/admin/users/$userId'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get user profile: ${response.body}');
+    }
+  }
+
+  static Future<void> resetUserPassword(int userId, String newPassword) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/users/$userId/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'new_password': newPassword}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reset password: ${response.body}');
     }
   }
 

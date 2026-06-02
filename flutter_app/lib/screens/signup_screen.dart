@@ -9,6 +9,8 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
@@ -23,6 +25,33 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    // Password validation
+    final password = _passwordController.text;
+    if (password.length < 8) {
+      setState(() {
+        errorMessage = 'Password must be at least 8 characters long';
+      });
+      return;
+    }
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      setState(() {
+        errorMessage = 'Password must contain at least one uppercase letter';
+      });
+      return;
+    }
+    if (!password.contains(RegExp(r'[a-z]'))) {
+      setState(() {
+        errorMessage = 'Password must contain at least one lowercase letter';
+      });
+      return;
+    }
+    if (!password.contains(RegExp(r'[0-9]'))) {
+      setState(() {
+        errorMessage = 'Password must contain at least one digit';
+      });
+      return;
+    }
+
     setState(() {
       isLoading = true;
       errorMessage = null;
@@ -32,6 +61,8 @@ class _SignupScreenState extends State<SignupScreen> {
       final response = await ApiService.signup(
         _emailController.text,
         _passwordController.text,
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
       );
 
       if (mounted) {
@@ -101,6 +132,34 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 48),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _firstNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'First Name',
+                            hintText: 'First name',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: _lastNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Last Name',
+                            hintText: 'Last name',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -119,6 +178,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       hintText: 'Enter your password',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
+                      helperText: 'Min 8 chars, 1 uppercase, 1 lowercase, 1 digit',
                     ),
                     obscureText: true,
                   ),
@@ -170,6 +230,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
