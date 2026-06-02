@@ -278,6 +278,9 @@ def delete_user(user_id: int) -> bool:
         # Delete prediction watchlist entries
         session.query(PredictionWatchlist).filter(PredictionWatchlist.user_id == user_id).delete()
         
+        # Delete budgets
+        session.query(Budget).filter(Budget.user_id == user_id).delete()
+        
         # Delete verification tokens
         session.query(VerificationToken).filter(VerificationToken.user_id == user_id).delete()
         
