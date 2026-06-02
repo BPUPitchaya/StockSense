@@ -59,6 +59,30 @@ class VerificationToken(Base):
     used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Notification(Base):
+    __tablename__ = 'notifications'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    type = Column(String, nullable=False)  # 'stock_alert', 'watchlist_update', 'budget_alert', 'admin_announcement'
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    # Optional fields for specific notification types
+    ticker = Column(String, nullable=True)
+    target_price = Column(Float, nullable=True)
+    current_price = Column(Float, nullable=True)
+
+class NotificationPreference(Base):
+    __tablename__ = 'notification_preferences'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    stock_alerts_enabled = Column(Boolean, default=True)
+    watchlist_updates_enabled = Column(Boolean, default=True)
+    budget_alerts_enabled = Column(Boolean, default=True)
+    admin_announcements_enabled = Column(Boolean, default=True)
+    email_notifications_enabled = Column(Boolean, default=False)  # Disabled until custom domain
+
 class PredictionHistory(Base):
     __tablename__ = 'prediction_history'
     id = Column(Integer, primary_key=True)
@@ -945,6 +969,172 @@ def remove_from_prediction_watchlist(ticker: str, user_id: int = None) -> bool:
             session.delete(item)
             session.commit()
             return True
+        return False
+    finally:
+        session.close()
+
+# Notification functions
+def create_notification(user_id: int, notification_type: str, title: str, message: str, 
+                        ticker: str = None, target_price: float = None, current_price: float = None) -> bool:
+    """Create a notification for a user"""
+    session = SessionLocal()
+    try:
+        notification = Notification(
+            user_id=user_id,
+            type=notification_type,
+            title=title,
+            message=message,
+            ticker=ticker,
+            target_price=target_price,
+            current_price=current_price
+        )
+        session.add(notification)
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating notification: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_user_notifications(user_id: int, unread_only: bool = False) -> list:
+    """Get notifications for a user"""
+    session = SessionLocal()
+    try:
+        query = session.query(Notification).filter(Notification.user_id == user_id)
+        if unread_only:
+            query = query.filter(Notification.is_read == False)
+        query = query.order_by(Notification.created_at.desc())
+        notifications = query.limit(100).all()
+        return [
+            {
+                'id': n.id,
+                'type': n.type,
+                'title': n.title,
+                'message': n.message,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat() if n.created_at else None,
+                'ticker': n.ticker,
+                'target_price': n.target_price,
+                'current_price': n.current_price
+            }
+            for n in notifications
+        ]
+    except Exception as e:
+        print(f"Error getting notifications: {e}")
+        return []
+    finally:
+        session.close()
+
+def mark_notification_read(notification_id: int, user_id: int) -> bool:
+    """Mark a notification as read"""
+    session = SessionLocal()
+    try:
+        notification = session.query(Notification).filter(
+            Notification.id == notification_id,
+            Notification.user_id == user_id
+        ).first()
+        if notification:
+            notification.is_read = True
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error marking notification as read: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def mark_all_notifications_read(user_id: int) -> bool:
+    """Mark all notifications as read for a user"""
+    session = SessionLocal()
+    try:
+        session.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        ).update({'is_read': True})
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error marking all notifications as read: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_unread_notification_count(user_id: int) -> int:
+    """Get count of unread notifications for a user"""
+    session = SessionLocal()
+    try:
+        count = session.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        ).count()
+        return count
+    except Exception as e:
+        print(f"Error getting unread notification count: {e}")
+        return 0
+    finally:
+        session.close()
+
+# Notification preference functions
+def get_notification_preferences(user_id: int) -> dict:
+    """Get notification preferences for a user"""
+    session = SessionLocal()
+    try:
+        pref = session.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+        if pref:
+            return {
+                'stock_alerts_enabled': pref.stock_alerts_enabled,
+                'watchlist_updates_enabled': pref.watchlist_updates_enabled,
+                'budget_alerts_enabled': pref.budget_alerts_enabled,
+                'admin_announcements_enabled': pref.admin_announcements_enabled,
+                'email_notifications_enabled': pref.email_notifications_enabled
+            }
+        # Create default preferences if not exist
+        default_pref = NotificationPreference(user_id=user_id)
+        session.add(default_pref)
+        session.commit()
+        return {
+            'stock_alerts_enabled': True,
+            'watchlist_updates_enabled': True,
+            'budget_alerts_enabled': True,
+            'admin_announcements_enabled': True,
+            'email_notifications_enabled': False
+        }
+    except Exception as e:
+        print(f"Error getting notification preferences: {e}")
+        return None
+    finally:
+        session.close()
+
+def update_notification_preferences(user_id: int, preferences: dict) -> bool:
+    """Update notification preferences for a user"""
+    session = SessionLocal()
+    try:
+        pref = session.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+        if not pref:
+            pref = NotificationPreference(user_id=user_id)
+            session.add(pref)
+        
+        if 'stock_alerts_enabled' in preferences:
+            pref.stock_alerts_enabled = preferences['stock_alerts_enabled']
+        if 'watchlist_updates_enabled' in preferences:
+            pref.watchlist_updates_enabled = preferences['watchlist_updates_enabled']
+        if 'budget_alerts_enabled' in preferences:
+            pref.budget_alerts_enabled = preferences['budget_alerts_enabled']
+        if 'admin_announcements_enabled' in preferences:
+            pref.admin_announcements_enabled = preferences['admin_announcements_enabled']
+        if 'email_notifications_enabled' in preferences:
+            pref.email_notifications_enabled = preferences['email_notifications_enabled']
+        
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating notification preferences: {e}")
+        session.rollback()
         return False
     finally:
         session.close()

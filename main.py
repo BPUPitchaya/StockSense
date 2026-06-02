@@ -177,6 +177,17 @@ class ProfileUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
+class NotificationPreferenceRequest(BaseModel):
+    stock_alerts_enabled: Optional[bool] = None
+    watchlist_updates_enabled: Optional[bool] = None
+    budget_alerts_enabled: Optional[bool] = None
+    admin_announcements_enabled: Optional[bool] = None
+    email_notifications_enabled: Optional[bool] = None
+
+class AnnouncementRequest(BaseModel):
+    title: str
+    message: str
+
 class Position(BaseModel):
     ticker: str
     buy_price: float
@@ -1576,6 +1587,148 @@ def set_user_currency(request: CurrencyRequest, authorization: str = Header(...)
             return {"message": "Currency updated", "currency": request.currency.upper()}
         else:
             raise HTTPException(status_code=400, detail="Failed to update currency")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Notification endpoints
+@app.get("/notifications")
+@limiter.limit("30/minute")
+def get_notifications(request: Request, unread_only: bool = False, authorization: str = Header(...)):
+    """Get user notifications"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        notifications = database.get_user_notifications(user_id, unread_only)
+        return {"notifications": notifications}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/notifications/{notification_id}/read")
+@limiter.limit("30/minute")
+def mark_notification_read(request: Request, notification_id: int, authorization: str = Header(...)):
+    """Mark a notification as read"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.mark_notification_read(notification_id, user_id)
+        if success:
+            return {"message": "Notification marked as read"}
+        else:
+            raise HTTPException(status_code=404, detail="Notification not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/notifications/read-all")
+@limiter.limit("10/minute")
+def mark_all_notifications_read(request: Request, authorization: str = Header(...)):
+    """Mark all notifications as read"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.mark_all_notifications_read(user_id)
+        if success:
+            return {"message": "All notifications marked as read"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to mark notifications as read")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/notifications/unread-count")
+@limiter.limit("30/minute")
+def get_unread_count(request: Request, authorization: str = Header(...)):
+    """Get unread notification count"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        count = database.get_unread_notification_count(user_id)
+        return {"unread_count": count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/notification-preferences")
+@limiter.limit("30/minute")
+def get_notification_preferences(request: Request, authorization: str = Header(...)):
+    """Get user notification preferences"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        preferences = database.get_notification_preferences(user_id)
+        if preferences:
+            return preferences
+        else:
+            raise HTTPException(status_code=500, detail="Failed to get preferences")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/notification-preferences")
+@limiter.limit("10/minute")
+def update_notification_preferences(request: Request, pref_request: NotificationPreferenceRequest, authorization: str = Header(...)):
+    """Update user notification preferences"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        preferences = {
+            'stock_alerts_enabled': pref_request.stock_alerts_enabled,
+            'watchlist_updates_enabled': pref_request.watchlist_updates_enabled,
+            'budget_alerts_enabled': pref_request.budget_alerts_enabled,
+            'admin_announcements_enabled': pref_request.admin_announcements_enabled,
+            'email_notifications_enabled': pref_request.email_notifications_enabled
+        }
+        # Remove None values
+        preferences = {k: v for k, v in preferences.items() if v is not None}
+        
+        success = database.update_notification_preferences(user_id, preferences)
+        if success:
+            return {"message": "Preferences updated successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update preferences")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/announcements")
+@limiter.limit("5/minute")
+def send_announcement(request: Request, announcement: AnnouncementRequest, authorization: str = Header(...)):
+    """Send announcement to all users (admin only)"""
+    try:
+        # Verify admin (you can add admin verification here)
+        # For now, we'll just send to all users
+        
+        # Get all users
+        users = database.get_all_users()
+        
+        # Create notification for each user
+        for user in users:
+            # Check if user has admin announcements enabled
+            pref = database.get_notification_preferences(user['id'])
+            if pref and pref.get('admin_announcements_enabled', True):
+                database.create_notification(
+                    user_id=user['id'],
+                    notification_type='admin_announcement',
+                    title=announcement.title,
+                    message=announcement.message
+                )
+        
+        return {"message": f"Announcement sent to {len(users)} users"}
     except HTTPException:
         raise
     except Exception as e:
