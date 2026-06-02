@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'stock_alerts_screen.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -157,6 +158,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.notifications_active),
+                          title: const Text('Manage Stock Price Alerts'),
+                          subtitle: const Text('Set up price alerts for your favorite stocks'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const StockAlertsScreen()),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),

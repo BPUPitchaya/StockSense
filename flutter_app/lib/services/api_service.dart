@@ -648,4 +648,45 @@ class ApiService {
       throw Exception('Failed to update notification preferences: ${response.body}');
     }
   }
+
+  // Stock price alert methods
+  static Future<void> createStockAlert(String ticker, double targetPrice, String condition) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/stock-alerts'),
+      headers: headers,
+      body: json.encode({
+        'ticker': ticker,
+        'target_price': targetPrice,
+        'condition': condition,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to create stock alert: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getStockAlerts() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/stock-alerts'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get stock alerts: ${response.body}');
+    }
+  }
+
+  static Future<void> deleteStockAlert(int alertId) async {
+    final headers = await _getHeaders();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/stock-alerts/$alertId'),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete stock alert: ${response.body}');
+    }
+  }
 }
