@@ -261,15 +261,33 @@ def reset_user_password(user_id: int, new_password: str) -> bool:
         session.close()
 
 def delete_user(user_id: int) -> bool:
-    """Delete a user (admin only)"""
+    """Delete a user (admin only) - cascades to related data"""
     session = SessionLocal()
     try:
         user = session.query(User).filter(User.id == user_id).first()
-        if user:
-            session.delete(user)
-            session.commit()
-            return True
-        return False
+        if not user:
+            return False
+        
+        # Delete related data first (cascade delete)
+        # Delete portfolio positions
+        session.query(PortfolioPosition).filter(PortfolioPosition.user_id == user_id).delete()
+        
+        # Delete personal watchlist entries
+        session.query(PersonalWatchlist).filter(PersonalWatchlist.user_id == user_id).delete()
+        
+        # Delete prediction watchlist entries
+        session.query(PredictionWatchlist).filter(PredictionWatchlist.user_id == user_id).delete()
+        
+        # Delete verification tokens
+        session.query(VerificationToken).filter(VerificationToken.user_id == user_id).delete()
+        
+        # Delete the user
+        session.delete(user)
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        raise e
     finally:
         session.close()
 
