@@ -50,7 +50,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Login'),
-        backgroundColor: Colors.black,
       ),
       body: SafeArea(
         child: Padding(

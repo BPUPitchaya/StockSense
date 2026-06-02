@@ -87,7 +87,6 @@ class _PredictionWatchlistScreenState extends State<PredictionWatchlistScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Track'),
-        backgroundColor: Colors.blue.shade700,
       ),
       body: ResponsiveBody(
         child: Padding(

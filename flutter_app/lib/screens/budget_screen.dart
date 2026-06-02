@@ -147,7 +147,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Budget & Recommendations'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ResponsiveBody(
         child: SingleChildScrollView(
