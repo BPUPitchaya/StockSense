@@ -560,4 +560,92 @@ class ApiService {
       throw Exception('Failed to reset user password: ${response.body}');
     }
   }
+
+  // Notification methods
+  static Future<Map<String, dynamic>> getNotifications({bool unreadOnly = false}) async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications?unread_only=$unreadOnly'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get notifications: ${response.body}');
+    }
+  }
+
+  static Future<int> getUnreadNotificationCount() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/unread-count'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['unread_count'] as int;
+    } else {
+      throw Exception('Failed to get unread count: ${response.body}');
+    }
+  }
+
+  static Future<void> markNotificationRead(int notificationId) async {
+    final headers = await _getHeaders();
+    final response = await http.put(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark notification as read: ${response.body}');
+    }
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    final headers = await _getHeaders();
+    final response = await http.put(
+      Uri.parse('$baseUrl/notifications/read-all'),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark all notifications as read: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getNotificationPreferences() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notification-preferences'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get notification preferences: ${response.body}');
+    }
+  }
+
+  static Future<void> updateNotificationPreferences({
+    bool? stockAlertsEnabled,
+    bool? watchlistUpdatesEnabled,
+    bool? budgetAlertsEnabled,
+    bool? adminAnnouncementsEnabled,
+    bool? emailNotificationsEnabled,
+  }) async {
+    final headers = await _getHeaders();
+    final body = {};
+    if (stockAlertsEnabled != null) body['stock_alerts_enabled'] = stockAlertsEnabled;
+    if (watchlistUpdatesEnabled != null) body['watchlist_updates_enabled'] = watchlistUpdatesEnabled;
+    if (budgetAlertsEnabled != null) body['budget_alerts_enabled'] = budgetAlertsEnabled;
+    if (adminAnnouncementsEnabled != null) body['admin_announcements_enabled'] = adminAnnouncementsEnabled;
+    if (emailNotificationsEnabled != null) body['email_notifications_enabled'] = emailNotificationsEnabled;
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/notification-preferences'),
+      headers: headers,
+      body: json.encode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update notification preferences: ${response.body}');
+    }
+  }
 }
