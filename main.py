@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import database
@@ -13,6 +15,9 @@ import json
 import numpy as np
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 class NumpySafeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -98,6 +103,22 @@ def convert_signals_to_predictions(signals_list):
 
 app = FastAPI()
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security middleware
+# HTTPS redirect (only in production)
+if os.getenv("ENVIRONMENT") == "production":
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+# Trusted host middleware (prevent host header attacks)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["stocksense-h0n6.onrender.com", "localhost", "127.0.0.1"]
+)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -106,6 +127,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 # JWT Secret
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
@@ -140,6 +172,10 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 class Position(BaseModel):
     ticker: str
@@ -237,6 +273,7 @@ def read_root():
     return {"message": "StockSense API is running"}
 
 @app.post("/signup")
+@limiter.limit("5/minute")
 def signup(request: SignupRequest):
     """User signup endpoint - email verification temporarily disabled"""
     try:
@@ -260,13 +297,14 @@ def signup(request: SignupRequest):
         if success:
             return {"message": "User created successfully. You can now log in."}
         else:
-            raise HTTPException(status_code=400, detail="User already exists")
+            raise HTTPException(status_code=400, detail="An account with this email already exists. Please try logging in or use a different email.")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/login")
+@limiter.limit("10/minute")
 def login(request: LoginRequest):
     """User login endpoint - email verification check temporarily disabled"""
     try:
@@ -280,20 +318,21 @@ def login(request: LoginRequest):
                 "user": user
             }
         else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            raise HTTPException(status_code=401, detail="Invalid email or password. Please check your credentials and try again.")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/login")
+@limiter.limit("10/minute")
 def admin_login(request: LoginRequest):
     """Admin login endpoint"""
     try:
         if database.verify_admin(request.email, request.password):
             return {"message": "Admin login successful", "email": request.email}
         else:
-            raise HTTPException(status_code=401, detail="Invalid admin credentials")
+            raise HTTPException(status_code=401, detail="Invalid admin credentials. Please check your email and password.")
     except HTTPException:
         raise
     except Exception as e:
@@ -385,6 +424,7 @@ def get_all_users():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin/users/{user_id}")
+@limiter.limit("30/minute")
 def get_user_profile(user_id: int):
     """Get detailed user profile (admin only)"""
     try:
@@ -427,6 +467,7 @@ def reset_user_password(user_id: int, request: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/admin/users/{user_id}")
+@limiter.limit("10/minute")
 def delete_user(user_id: int):
     """Delete a user (admin only)"""
     try:
@@ -483,6 +524,7 @@ def get_categories():
     return {"categories": list(signals.CATEGORIES.keys())}
 
 @app.get("/signals")
+@limiter.limit("30/minute")
 def get_signals(category: Optional[str] = None, refresh: bool = False):
     """Get trading signals - instant with stale-while-revalidate"""
     cache_key = get_cache_key("signals_5stocks", category=category or "all")
@@ -539,9 +581,10 @@ def get_signals(category: Optional[str] = None, refresh: bool = False):
     
     # All retries failed
     print(f"All retries failed for signals fetch")
-    raise HTTPException(status_code=503, detail="Stock data temporarily unavailable. Please try again.")
+    raise HTTPException(status_code=503, detail="Unable to fetch stock data at this time. The service may be temporarily unavailable. Please try again in a few minutes.")
 
 @app.get("/predictions")
+@limiter.limit("30/minute")
 def get_predictions(category: Optional[str] = None, authorization: str = Header(...)):
     """Get predictions using same fast signals as main page for consistency"""
     try:
@@ -622,11 +665,12 @@ def get_predictions(category: Optional[str] = None, authorization: str = Header(
                     time.sleep(1)
         
         # All retries failed
-        raise HTTPException(status_code=503, detail="Prediction service temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=503, detail="Unable to generate predictions at this time. The prediction service may be temporarily unavailable. Please try again in a few minutes.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predictions/history/{ticker}")
+@limiter.limit("30/minute")
 def get_prediction_history_endpoint(ticker: str):
     """Get historical predictions for a ticker to show accuracy"""
     try:
@@ -861,6 +905,7 @@ def get_projection(ticker: str, period: str = "1y"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/portfolio")
+@limiter.limit("20/minute")
 def add_position(position: Position, authorization: str = Header(...)):
     """Add a position to portfolio"""
     try:
@@ -881,6 +926,7 @@ def add_position(position: Position, authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/portfolio")
+@limiter.limit("30/minute")
 def get_portfolio(authorization: str = Header(...)):
     """Get portfolio positions"""
     try:
@@ -897,6 +943,7 @@ def get_portfolio(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/portfolio/{position_id}")
+@limiter.limit("20/minute")
 def delete_position(position_id: int, authorization: str = Header(...)):
     """Delete a position from portfolio"""
     try:
@@ -907,13 +954,14 @@ def delete_position(position_id: int, authorization: str = Header(...)):
         if success:
             return {"message": "Position deleted successfully"}
         else:
-            raise HTTPException(status_code=404, detail="Position not found")
+            raise HTTPException(status_code=404, detail="Position not found. It may have been already deleted.")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/watchlist")
+@limiter.limit("20/minute")
 def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)):
     """Add a stock to personal watchlist (also adds to prediction watchlist for tracking)"""
     try:
@@ -922,7 +970,7 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
         
         current = database.get_personal_watchlist(user_id=user_id)
         if len(current) >= 5:
-            raise HTTPException(status_code=400, detail="Watchlist limit reached (max 5 stocks)")
+            raise HTTPException(status_code=400, detail="Watchlist limit reached. You can only track up to 5 stocks at a time. Please remove some stocks from your watchlist first.")
         
         # Get current price for tracking
         try:
@@ -936,7 +984,7 @@ def add_to_watchlist(request: WatchlistRequest, authorization: str = Header(...)
         # Add to regular watchlist
         success = database.add_to_watchlist(request.ticker, user_id=user_id)
         if not success:
-            raise HTTPException(status_code=400, detail="Stock already in watchlist")
+            raise HTTPException(status_code=400, detail="This stock is already in your watchlist.")
         
         # Also add to prediction watchlist for tracking
         database.add_to_prediction_watchlist(request.ticker, current_price, user_id=user_id)
@@ -962,6 +1010,7 @@ def get_watchlist(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/watchlist/{ticker}")
+@limiter.limit("20/minute")
 def remove_from_watchlist(ticker: str, authorization: str = Header(...)):
     """Remove a stock from personal watchlist (also removes from prediction watchlist)"""
     try:
@@ -974,7 +1023,7 @@ def remove_from_watchlist(ticker: str, authorization: str = Header(...)):
             database.remove_from_prediction_watchlist(ticker, user_id=user_id)
             return {"message": "Stock removed from watchlist"}
         else:
-            raise HTTPException(status_code=404, detail="Stock not in watchlist")
+            raise HTTPException(status_code=404, detail="Stock not found in your watchlist. It may have been already removed.")
     except HTTPException:
         raise
     except Exception as e:
@@ -985,6 +1034,7 @@ class PredictionWatchlistRequest(BaseModel):
     added_price: float
 
 @app.post("/prediction-watchlist")
+@limiter.limit("20/minute")
 def add_to_prediction_watchlist(request: PredictionWatchlistRequest, authorization: str = Header(...)):
     """Add a stock to prediction watchlist"""
     try:
@@ -995,13 +1045,14 @@ def add_to_prediction_watchlist(request: PredictionWatchlistRequest, authorizati
         if success:
             return {"message": "Stock added to prediction watchlist"}
         else:
-            raise HTTPException(status_code=400, detail="Stock already in prediction watchlist")
+            raise HTTPException(status_code=400, detail="This stock is already in your prediction watchlist.")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/prediction-watchlist")
+@limiter.limit("30/minute")
 def get_prediction_watchlist(authorization: str = Header(...)):
     """Get prediction watchlist with performance tracking"""
     try:
@@ -1064,6 +1115,7 @@ def get_prediction_watchlist(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/prediction-watchlist/{ticker}")
+@limiter.limit("20/minute")
 def remove_from_prediction_watchlist(ticker: str, authorization: str = Header(...)):
     """Remove a stock from prediction watchlist"""
     try:
@@ -1074,7 +1126,7 @@ def remove_from_prediction_watchlist(ticker: str, authorization: str = Header(..
         if success:
             return {"message": "Stock removed from prediction watchlist"}
         else:
-            raise HTTPException(status_code=404, detail="Stock not in prediction watchlist")
+            raise HTTPException(status_code=404, detail="Stock not found in your prediction watchlist. It may have been already removed.")
     except HTTPException:
         raise
     except Exception as e:
@@ -1394,6 +1446,7 @@ def get_supported_currencies():
     }
 
 @app.get("/user/currency")
+@limiter.limit("30/minute")
 def get_user_currency(authorization: str = Header(...)):
     """Get user's preferred currency"""
     try:
@@ -1401,6 +1454,88 @@ def get_user_currency(authorization: str = Header(...)):
         user_id = payload.get("user_id")
         currency = database.get_user_currency(user_id)
         return {"currency": currency, "symbol": CURRENCY_SYMBOLS.get(currency, '$')}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/user/profile")
+@limiter.limit("20/minute")
+def update_user_profile(request: ProfileUpdateRequest, authorization: str = Header(...)):
+    """Update user profile information"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.update_user_profile(user_id, request.first_name, request.last_name)
+        if success:
+            return {"message": "Profile updated successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/user/profile")
+@limiter.limit("30/minute")
+def get_user_profile_endpoint(authorization: str = Header(...)):
+    """Get current user profile"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        profile = database.get_user_profile(user_id)
+        if profile:
+            return profile
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@app.post("/user/change-password")
+@limiter.limit("5/minute")
+def change_user_password(request: PasswordChangeRequest, authorization: str = Header(...)):
+    """Change user password"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        # Get user email
+        user = database.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Verify current password
+        if not database.verify_user(user['email'], request.current_password):
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+        
+        # Validate new password
+        new_password = request.new_password
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+        if not any(c.isupper() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in new_password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+        
+        # Update password
+        import hashlib
+        password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+        success = database.update_user_password(user['email'], password_hash)
+        
+        if success:
+            return {"message": "Password changed successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update password")
     except HTTPException:
         raise
     except Exception as e:

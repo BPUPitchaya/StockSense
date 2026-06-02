@@ -4,6 +4,7 @@ import '../services/currency_service.dart';
 import '../utils/responsive.dart';
 import '../main.dart' show themeService;
 import '../theme.dart' show ThemeService;
+import 'user_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -154,6 +155,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Edit Profile'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UserProfileScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 16),
             ListTile(

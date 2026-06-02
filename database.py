@@ -281,8 +281,7 @@ def delete_user(user_id: int) -> bool:
         # Delete budgets
         session.query(Budget).filter(Budget.user_id == user_id).delete()
         
-        # Delete verification tokens
-        session.query(VerificationToken).filter(VerificationToken.user_id == user_id).delete()
+        # Note: verification_tokens table structure differs in production, skip cascade delete
         
         # Delete the user
         session.delete(user)
@@ -759,6 +758,28 @@ def update_user_password(email: str, new_password_hash: str) -> bool:
     finally:
         session.close()
 
+def update_user_profile(user_id: int, first_name: Optional[str] = None, last_name: Optional[str] = None) -> bool:
+    """Update user profile information"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if not user:
+            return False
+        
+        if first_name is not None:
+            user.first_name = first_name
+        if last_name is not None:
+            user.last_name = last_name
+        
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating user profile: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
 def get_user_by_email(email: str) -> Optional[Dict]:
     """Get user by email"""
     session = SessionLocal()
@@ -773,6 +794,26 @@ def get_user_by_email(email: str) -> Optional[Dict]:
         return None
     except Exception as e:
         print(f"Error getting user by email: {e}")
+        return None
+    finally:
+        session.close()
+
+def get_user_by_id(user_id: int) -> Optional[Dict]:
+    """Get user by ID"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user:
+            return {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_verified': user.is_verified
+            }
+        return None
+    except Exception as e:
+        print(f"Error getting user by ID: {e}")
         return None
     finally:
         session.close()

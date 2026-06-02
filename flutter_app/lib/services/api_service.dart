@@ -502,4 +502,50 @@ class ApiService {
       throw Exception('Failed to get exchange rates');
     }
   }
+
+  // User profile methods
+  static Future<Map<String, dynamic>> getUserProfile() async {
+    final headers = await _getHeaders();
+    final token = await _getToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/user/profile'),
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get user profile');
+    }
+  }
+
+  static Future<void> updateUserProfile({String? firstName, String? lastName}) async {
+    final headers = await _getHeaders();
+    final body = {};
+    if (firstName != null) body['first_name'] = firstName;
+    if (lastName != null) body['last_name'] = lastName;
+    
+    final response = await http.put(
+      Uri.parse('$baseUrl/user/profile'),
+      headers: headers,
+      body: json.encode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update profile: ${response.body}');
+    }
+  }
+
+  static Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/user/change-password'),
+      headers: headers,
+      body: json.encode({
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to change password: ${response.body}');
+    }
+  }
 }
