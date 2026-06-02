@@ -439,10 +439,11 @@ def get_user_profile(request: Request, user_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/users/{user_id}/reset-password")
-def reset_user_password(user_id: int, request: dict):
+@limiter.limit("10/minute")
+def reset_user_password(request: Request, user_id: int, password_request: dict):
     """Reset user password (admin only)"""
     try:
-        new_password = request.get("new_password")
+        new_password = password_request.get("new_password")
         if not new_password:
             raise HTTPException(status_code=400, detail="new_password is required")
         

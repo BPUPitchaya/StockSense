@@ -548,4 +548,16 @@ class ApiService {
       throw Exception('Failed to change password: ${response.body}');
     }
   }
+
+  static Future<void> adminResetUserPassword(int userId, String newPassword) async {
+    final headers = await _getHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/users/$userId/reset-password'),
+      headers: headers,
+      body: json.encode({'new_password': newPassword}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reset user password: ${response.body}');
+    }
+  }
 }

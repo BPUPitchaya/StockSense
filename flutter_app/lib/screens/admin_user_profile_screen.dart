@@ -283,7 +283,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
 
   Future<void> _resetPassword(String newPassword) async {
     try {
-      await ApiService.resetUserPassword(widget.userId, newPassword);
+      await ApiService.adminResetUserPassword(widget.userId, newPassword);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Password reset successfully')),
