@@ -300,13 +300,13 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   return;
                 }
                 
-                Navigator.pop(context);
                 try {
                   await ApiService.createStockAlert(widget.signal.ticker, price, condition);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Price alert set for ${widget.signal.ticker}')),
                     );
+                    Navigator.pop(context);
                   }
                 } catch (e) {
                   if (mounted) {
