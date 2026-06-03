@@ -303,13 +303,17 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 Navigator.pop(context);
                 try {
                   await ApiService.createStockAlert(widget.signal.ticker, price, condition);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Price alert set for ${widget.signal.ticker}')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Price alert set for ${widget.signal.ticker}')),
+                    );
+                  }
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create alert: $e')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to create alert: $e')),
+                    );
+                  }
                 }
               },
               child: const Text('Create Alert'),
