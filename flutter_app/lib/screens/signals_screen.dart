@@ -54,7 +54,22 @@ class _SignalsScreenState extends State<SignalsScreen> {
     }
   }
 
-  String _formatPrice(double usdPrice) {
+  String _formatPrice(double usdPrice, String? currency) {
+    // If user prefers native currency and stock has a native currency, use it
+    if (CurrencyService.useNativeCurrency && currency != null && currency != 'USD') {
+      final currencySymbols = {
+        'USD': '\$', 'AUD': 'A\$', 'NZD': 'NZ\$', 'GBP': '£',
+        'EUR': '€', 'JPY': '¥', 'CNY': '¥', 'CAD': 'C\$',
+        'HKD': 'HK\$', 'SGD': 'S\$', 'KRW': '₩', 'INR': '₹',
+      };
+      final sym = currencySymbols[currency] ?? currency;
+      if (currency == 'JPY' || currency == 'KRW') {
+        return '$sym${usdPrice.toStringAsFixed(0)}';
+      }
+      return '$sym${usdPrice.toStringAsFixed(2)}';
+    }
+    
+    // Otherwise use user's preferred currency
     final converted = CurrencyService.convert(usdPrice);
     if (CurrencyService.currency == 'KRW') {
       return '${converted.toStringAsFixed(0)}${CurrencyService.symbol}';
@@ -470,7 +485,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _formatPrice(signal.currentPrice),
+                    _formatPrice(signal.currentPrice, signal.currency),
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -530,9 +545,9 @@ class _SignalsScreenState extends State<SignalsScreen> {
                 Row(
                   children: [
                     if (signal.ma50 != null)
-                      _miniStat('MA50', _formatPrice(signal.ma50!)),
+                      _miniStat('MA50', _formatPrice(signal.ma50!, signal.currency)),
                     if (signal.ma200 != null)
-                      _miniStat('MA200', _formatPrice(signal.ma200!)),
+                      _miniStat('MA200', _formatPrice(signal.ma200!, signal.currency)),
                     if (signal.rsi != null)
                       _miniStat('RSI', signal.rsi!.toStringAsFixed(1)),
                   ],

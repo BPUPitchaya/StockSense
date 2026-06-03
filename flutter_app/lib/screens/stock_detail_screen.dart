@@ -71,6 +71,17 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   /// Falls back to user's CurrencyService if currency unknown.
   String _fmtPrice(double price) {
     final nativeCurrency = stockInfo?['currency'] as String?;
+    
+    // If user prefers native currency and stock has a native currency, use it
+    if (CurrencyService.useNativeCurrency && nativeCurrency != null && nativeCurrency != 'USD') {
+      final sym = _currencySymbols[nativeCurrency] ?? nativeCurrency;
+      if (nativeCurrency == 'JPY' || nativeCurrency == 'KRW') {
+        return '$sym${price.toStringAsFixed(0)}';
+      }
+      return '$sym${price.toStringAsFixed(2)}';
+    }
+    
+    // Otherwise use user's preferred currency
     if (nativeCurrency != null && nativeCurrency != 'USD') {
       final sym = _currencySymbols[nativeCurrency] ?? nativeCurrency;
       if (nativeCurrency == 'JPY' || nativeCurrency == 'KRW') {

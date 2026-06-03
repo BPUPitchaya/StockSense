@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? selectedCurrency;
   String? currentSymbol;
   bool isLoadingCurrencies = true;
+  bool useNativeCurrency = false;
   
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final userCurrency = results[1] as Map<String, dynamic>;
           selectedCurrency = userCurrency['currency'];
           currentSymbol = userCurrency['symbol'];
+          useNativeCurrency = userCurrency['use_native_currency'] ?? false;
           isLoadingCurrencies = false;
         });
       }
@@ -73,6 +75,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update currency: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateNativeCurrencyPreference(bool value) async {
+    try {
+      await ApiService.updateUserProfile(useNativeCurrency: value);
+      await CurrencyService.reload();
+      final userCurrency = await ApiService.getUserCurrency();
+      
+      if (mounted) {
+        setState(() {
+          useNativeCurrency = userCurrency['use_native_currency'] ?? false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(value ? 'Native currency enabled' : 'Native currency disabled')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update preference: $e')),
         );
       }
     }
@@ -133,6 +158,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: const TextStyle(color: Colors.grey),
                 ),
               ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Use Native Currency'),
+              subtitle: const Text('Show stocks in their original currency (e.g., Samsung in KRW)'),
+              value: useNativeCurrency,
+              onChanged: _updateNativeCurrencyPreference,
+            ),
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),

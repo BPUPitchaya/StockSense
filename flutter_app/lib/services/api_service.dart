@@ -518,11 +518,12 @@ class ApiService {
     }
   }
 
-  static Future<void> updateUserProfile({String? firstName, String? lastName}) async {
+  static Future<void> updateUserProfile({String? firstName, String? lastName, bool? useNativeCurrency}) async {
     final headers = await _getHeaders();
     final body = {};
     if (firstName != null) body['first_name'] = firstName;
     if (lastName != null) body['last_name'] = lastName;
+    if (useNativeCurrency != null) body['use_native_currency'] = useNativeCurrency;
     
     final response = await http.put(
       Uri.parse('$baseUrl/user/profile'),

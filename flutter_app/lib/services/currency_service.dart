@@ -4,9 +4,11 @@ class CurrencyService {
   static String _currency = 'USD';
   static String _symbol = '\$';
   static Map<String, dynamic> _rates = {};
+  static bool _useNativeCurrency = false;
 
   static String get currency => _currency;
   static String get symbol => _symbol;
+  static bool get useNativeCurrency => _useNativeCurrency;
 
   static Future<void> load() async {
     try {
@@ -18,6 +20,7 @@ class CurrencyService {
       final ratesData = results[1] as Map<String, dynamic>;
       _currency = userCurrency['currency'] ?? 'USD';
       _symbol = userCurrency['symbol'] ?? '\$';
+      _useNativeCurrency = userCurrency['use_native_currency'] ?? false;
       _rates = (ratesData['rates'] as Map<String, dynamic>?) ?? {};
     } catch (_) {
       // Keep existing values on failure
