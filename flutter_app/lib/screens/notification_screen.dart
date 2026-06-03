@@ -194,8 +194,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (dateStr == null) return '';
     try {
       final date = DateTime.parse(dateStr);
+      // Convert UTC to local time
+      final localDate = date.toLocal();
       final now = DateTime.now();
-      final difference = now.difference(date);
+      final difference = now.difference(localDate);
       
       if (difference.inMinutes < 1) {
         return 'Just now';
@@ -206,7 +208,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       } else if (difference.inDays < 7) {
         return '${difference.inDays} days ago';
       } else {
-        return '${date.day}/${date.month}/${date.year}';
+        return '${localDate.day}/${localDate.month}/${localDate.year}';
       }
     } catch (_) {
       return dateStr;

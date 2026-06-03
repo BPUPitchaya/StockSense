@@ -185,7 +185,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   await ApiService.createStockAlert(ticker, price, condition);
                   _loadAlerts();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Alert created successfully')),
+                    SnackBar(content: Text('Price alert set for $ticker')),
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
