@@ -1164,6 +1164,18 @@ def create_stock_price_alert(user_id: int, ticker: str, target_price: float, con
         )
         session.add(alert)
         session.commit()
+        
+        # Create notification to confirm alert was set
+        condition_text = condition.lower()
+        create_notification(
+            user_id=user_id,
+            notification_type='stock_alert',
+            title=f'Price Alert Set: {ticker.upper()}',
+            message=f'Alert set for {ticker.upper()} when price goes {condition_text} \${target_price:.2f}',
+            ticker=ticker.upper(),
+            target_price=target_price
+        )
+        
         return True
     except Exception as e:
         print(f"Error creating stock price alert: {e}")
