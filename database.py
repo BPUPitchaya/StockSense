@@ -23,6 +23,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     preferred_currency = Column(String, default='USD')  # User's preferred currency
+    use_native_currency = Column(Boolean, default=False)  # Show stock in native currency
     is_verified = Column(Boolean, default=False)  # Email verification status
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -273,6 +274,7 @@ def get_user_profile(user_id: int) -> Dict:
             'email': user.email,
             'password_hash': user.password_hash,
             'preferred_currency': user.preferred_currency,
+            'use_native_currency': user.use_native_currency,
             'is_verified': user.is_verified,
             'created_at': user.created_at.isoformat() if user.created_at else None
         }
@@ -589,6 +591,18 @@ def get_user_currency(user_id: int) -> str:
     finally:
         session.close()
 
+def get_user_native_currency_preference(user_id: int) -> bool:
+    """Get user's preference for using native currency"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        return user.use_native_currency if user else False
+    except Exception as e:
+        print(f"Error getting native currency preference: {e}")
+        return False
+    finally:
+        session.close()
+
 def set_user_currency(user_id: int, currency: str) -> bool:
     """Set user's preferred currency"""
     session = SessionLocal()
@@ -794,7 +808,7 @@ def update_user_password(email: str, new_password_hash: str) -> bool:
     finally:
         session.close()
 
-def update_user_profile(user_id: int, first_name: Optional[str] = None, last_name: Optional[str] = None) -> bool:
+def update_user_profile(user_id: int, first_name: Optional[str] = None, last_name: Optional[str] = None, use_native_currency: Optional[bool] = None) -> bool:
     """Update user profile information"""
     session = SessionLocal()
     try:
@@ -806,6 +820,8 @@ def update_user_profile(user_id: int, first_name: Optional[str] = None, last_nam
             user.first_name = first_name
         if last_name is not None:
             user.last_name = last_name
+        if use_native_currency is not None:
+            user.use_native_currency = use_native_currency
         
         session.commit()
         return True

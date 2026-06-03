@@ -176,6 +176,7 @@ class LoginRequest(BaseModel):
 class ProfileUpdateRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    use_native_currency: Optional[bool] = None
 
 class NotificationPreferenceRequest(BaseModel):
     stock_alerts_enabled: Optional[bool] = None
@@ -1520,7 +1521,8 @@ def get_user_currency(request: Request, authorization: str = Header(...)):
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         currency = database.get_user_currency(user_id)
-        return {"currency": currency, "symbol": CURRENCY_SYMBOLS.get(currency, '$')}
+        use_native = database.get_user_native_currency_preference(user_id)
+        return {"currency": currency, "symbol": CURRENCY_SYMBOLS.get(currency, '$'), "use_native_currency": use_native}
     except HTTPException:
         raise
     except Exception as e:
@@ -1534,7 +1536,7 @@ def update_user_profile(request: Request, profile_request: ProfileUpdateRequest,
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        success = database.update_user_profile(user_id, profile_request.first_name, profile_request.last_name)
+        success = database.update_user_profile(user_id, profile_request.first_name, profile_request.last_name, profile_request.use_native_currency)
         if success:
             return {"message": "Profile updated successfully"}
         else:
