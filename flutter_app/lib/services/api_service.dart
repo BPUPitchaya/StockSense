@@ -649,6 +649,17 @@ class ApiService {
     }
   }
 
+  static Future<void> deleteNotification(int notificationId) async {
+    final headers = await _getHeaders();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/$notificationId'),
+      headers: headers,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete notification: ${response.body}');
+    }
+  }
+
   // Stock price alert methods
   static Future<void> createStockAlert(String ticker, double targetPrice, String condition) async {
     final headers = await _getHeaders();

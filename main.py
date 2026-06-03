@@ -1659,6 +1659,24 @@ def mark_notification_read(request: Request, notification_id: int, authorization
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/notifications/{notification_id}")
+@limiter.limit("30/minute")
+def delete_notification(request: Request, notification_id: int, authorization: str = Header(...)):
+    """Delete a notification"""
+    try:
+        payload = verify_jwt_token(authorization)
+        user_id = payload.get("user_id")
+        
+        success = database.delete_notification(notification_id, user_id)
+        if success:
+            return {"message": "Notification deleted"}
+        else:
+            raise HTTPException(status_code=404, detail="Notification not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.put("/notifications/read-all")
 @limiter.limit("10/minute")
 def mark_all_notifications_read(request: Request, authorization: str = Header(...)):

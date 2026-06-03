@@ -1039,6 +1039,26 @@ def get_user_notifications(user_id: int, unread_only: bool = False) -> list:
     finally:
         session.close()
 
+def delete_notification(notification_id: int, user_id: int) -> bool:
+    """Delete a notification for a user"""
+    session = SessionLocal()
+    try:
+        notification = session.query(Notification).filter(
+            Notification.id == notification_id,
+            Notification.user_id == user_id
+        ).first()
+        if notification:
+            session.delete(notification)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error deleting notification: {e}")
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
 def mark_notification_read(notification_id: int, user_id: int) -> bool:
     """Mark a notification as read"""
     session = SessionLocal()

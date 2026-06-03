@@ -50,6 +50,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
+  Future<void> _deleteNotification(int notificationId) async {
+    try {
+      await ApiService.deleteNotification(notificationId);
+      _loadNotifications();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notification deleted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e')),
+      );
+    }
+  }
+
   Future<void> _markAllAsRead() async {
     try {
       await ApiService.markAllNotificationsRead();
@@ -175,13 +189,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 ),
                               ],
                             ),
-                            trailing: !isRead
-                                ? IconButton(
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isRead)
+                                  IconButton(
                                     icon: const Icon(Icons.check),
                                     onPressed: () => _markAsRead(notification['id']),
                                     tooltip: 'Mark as read',
-                                  )
-                                : null,
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _deleteNotification(notification['id']),
+                                  tooltip: 'Delete',
+                                ),
+                              ],
+                            ),
                             onTap: () => _markAsRead(notification['id']),
                           ),
                         );
