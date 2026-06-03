@@ -162,6 +162,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       ),
                       const SizedBox(height: 16),
                       Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: theme.colorScheme.primary, width: 2),
+                        ),
                         child: ListTile(
                           leading: const Icon(Icons.notifications_active),
                           title: const Text('Manage Stock Price Alerts'),
