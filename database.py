@@ -173,6 +173,14 @@ def init_db():
                 conn.commit()
             print("last_name column added to users")
         
+        # Add use_native_currency column to users if it doesn't exist
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'use_native_currency' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN use_native_currency BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+            print("use_native_currency column added to users")
+        
         # Create verification_tokens table if it doesn't exist
         if 'verification_tokens' not in inspector.get_table_names():
             VerificationToken.__table__.create(bind=engine)
