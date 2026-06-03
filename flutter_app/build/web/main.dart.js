@@ -100313,20 +100313,19 @@ var $async$$0=A.A(function(a,b){if(a===1){o.push(b)
 s=p}for(;;)switch(s){case 0:i=A.j1(n.c.a.a)
 if(i==null||i<=0){n.d.K(t.q).f.b4(B.D1)
 s=1
-break}l=n.d
-A.cu(l,!1).dX(null)
-p=4
-k=n.b
+break}p=4
+l=n.b
 s=7
-return A.n(A.zt(k.a.c.a,i,n.a.a),$async$$0)
-case 7:if(k.c!=null)l.K(t.q).f.b4(A.cQ(null,null,null,null,null,B.j,null,A.N("Price alert set for "+k.a.c.a,null,null,null,null,null,null,null),null,B.C,null,null,null,null,null,null,null,null,null,null))
-p=2
+return A.n(A.zt(l.a.c.a,i,n.a.a),$async$$0)
+case 7:if(l.c!=null){k=n.d
+k.K(t.q).f.b4(A.cQ(null,null,null,null,null,B.j,null,A.N("Price alert set for "+l.a.c.a,null,null,null,null,null,null,null),null,B.C,null,null,null,null,null,null,null,null,null,null))
+A.cu(k,!1).dX(null)}p=2
 s=6
 break
 case 4:p=3
 h=o.pop()
 m=A.af(h)
-if(n.b.c!=null)l.K(t.q).f.b4(A.cQ(null,null,null,null,null,B.j,null,A.N("Failed to create alert: "+A.k(m),null,null,null,null,null,null,null),null,B.C,null,null,null,null,null,null,null,null,null,null))
+if(n.b.c!=null)n.d.K(t.q).f.b4(A.cQ(null,null,null,null,null,B.j,null,A.N("Failed to create alert: "+A.k(m),null,null,null,null,null,null,null),null,B.C,null,null,null,null,null,null,null,null,null,null))
 s=6
 break
 case 3:s=2
