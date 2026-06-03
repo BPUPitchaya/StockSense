@@ -921,14 +921,22 @@ def get_stock_info(ticker: str) -> Optional[Dict]:
             cached = redis_client.get(cache_key)
             if cached:
                 print(f"Using Redis cached info for {ticker}")
-                return json.loads(cached)
+                result = json.loads(cached)
+                # Ensure currency field exists (for backward compatibility)
+                if 'currency' not in result:
+                    result['currency'] = 'USD'
+                return result
         except Exception as e:
             print(f"Redis cache read failed: {e}")
     
     # Fallback to local cache
     if ticker in _stock_info_cache:
         print(f"Using local cached info for {ticker}")
-        return _stock_info_cache[ticker]
+        result = _stock_info_cache[ticker]
+        # Ensure currency field exists (for backward compatibility)
+        if 'currency' not in result:
+            result['currency'] = 'USD'
+        return result
     
     max_retries = 3
     for attempt in range(max_retries):
