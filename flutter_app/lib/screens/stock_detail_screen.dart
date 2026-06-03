@@ -221,8 +221,16 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final priceController = TextEditingController();
     String condition = 'above';
     
+    // Show loading state if stockInfo not loaded yet
+    if (stockInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading stock data, please wait...')),
+      );
+      return;
+    }
+    
     // Pre-fill with current price if available
-    if (stockInfo != null && stockInfo!['current_price'] != null) {
+    if (stockInfo!['current_price'] != null) {
       priceController.text = stockInfo!['current_price'].toStringAsFixed(2);
     }
 
@@ -235,7 +243,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Current price: \$${stockInfo?['current_price']?.toStringAsFixed(2) ?? 'N/A'}',
+                'Current price: \$${stockInfo!['current_price']?.toStringAsFixed(2) ?? 'Loading...'}',
                 style: const TextStyle(
                   color: Colors.green,
                   fontWeight: FontWeight.bold,
