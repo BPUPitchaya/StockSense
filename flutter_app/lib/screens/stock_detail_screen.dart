@@ -217,6 +217,101 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     }
   }
 
+  void _showPriceAlertDialog() {
+    final priceController = TextEditingController();
+    String condition = 'above';
+    
+    // Pre-fill with current price if available
+    if (stockInfo != null && stockInfo!['current_price'] != null) {
+      priceController.text = stockInfo!['current_price'].toStringAsFixed(2);
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Set Price Alert for ${widget.signal.ticker}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Current price: \$${stockInfo?['current_price']?.toStringAsFixed(2) ?? 'N/A'}',
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: priceController,
+                decoration: const InputDecoration(
+                  labelText: 'Target Price',
+                  hintText: 'e.g., 150.00',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              const Text('Alert when price is:'),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'above',
+                    label: Text('Above'),
+                    icon: Icon(Icons.arrow_upward),
+                  ),
+                  ButtonSegment(
+                    value: 'below',
+                    label: Text('Below'),
+                    icon: Icon(Icons.arrow_downward),
+                  ),
+                ],
+                selected: {condition},
+                onSelectionChanged: (Set<String> newSelection) {
+                  setDialogState(() {
+                    condition = newSelection.first;
+                  });
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final price = double.tryParse(priceController.text);
+                
+                if (price == null || price <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid price')),
+                  );
+                  return;
+                }
+                
+                Navigator.pop(context);
+                try {
+                  await ApiService.createStockAlert(widget.signal.ticker, price, condition);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Alert created for ${widget.signal.ticker}')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to create alert: $e')),
+                  );
+                }
+              },
+              child: const Text('Create Alert'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAddToPortfolioDialog() {
     _buyDate = DateTime.now();
     _quantityController.clear();
@@ -419,6 +514,11 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             ),
             onPressed: isInWatchlist ? _removeFromPersonalWatchlist : _addToPersonalWatchlist,
             tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: _showPriceAlertDialog,
+            tooltip: 'Set price alert',
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
