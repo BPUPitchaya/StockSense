@@ -139,13 +139,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             : const Text('Login as Admin'),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Back to regular login'),
-                    ),
                   ],
                 ),
               ),
