@@ -57,6 +57,32 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     final tickerController = TextEditingController();
     final priceController = TextEditingController();
     String condition = 'above';
+    String? currentPrice;
+    bool isLoadingPrice = false;
+
+    Future<void> fetchCurrentPrice() async {
+      final ticker = tickerController.text.trim().toUpperCase();
+      if (ticker.isEmpty) return;
+      
+      setState(() {
+        isLoadingPrice = true;
+      });
+      
+      try {
+        final stockInfo = await ApiService.getStockInfo(ticker);
+        if (stockInfo != null && stockInfo['current_price'] != null) {
+          setState(() {
+            currentPrice = stockInfo['current_price'].toStringAsFixed(2);
+          });
+        }
+      } catch (e) {
+        // Ignore error, just don't show price
+      } finally {
+        setState(() {
+          isLoadingPrice = false;
+        });
+      }
+    }
 
     showDialog(
       context: context,
@@ -74,7 +100,28 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   border: OutlineInputBorder(),
                 ),
                 textCapitalization: TextCapitalization.characters,
+                onChanged: (value) {
+                  if (value.length >= 2) {
+                    fetchCurrentPrice();
+                  }
+                },
               ),
+              if (isLoadingPrice)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: CircularProgressIndicator(),
+                )
+              else if (currentPrice != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Current price: \$$currentPrice',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 16),
               TextField(
                 controller: priceController,
