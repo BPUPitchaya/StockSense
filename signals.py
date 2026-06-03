@@ -750,7 +750,11 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             cached = redis_client.get(cache_key)
             if cached:
                 print(f"Using Redis cached Finnhub info for {ticker}")
-                return json.loads(cached)
+                result = json.loads(cached)
+                # Ensure currency field exists (for backward compatibility)
+                if 'currency' not in result:
+                    result['currency'] = 'USD'
+                return result
         except Exception as e:
             print(f"Redis cache read failed: {e}")
     
