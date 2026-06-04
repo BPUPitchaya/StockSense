@@ -1,3 +1,8 @@
+# Load environment variables from .env file for local development
+# This must be done before any imports that might check environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,12 +17,22 @@ import time
 import jwt
 import os
 import json
+import hashlib
+import logging
 import numpy as np
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 class NumpySafeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -122,7 +137,11 @@ app.add_middleware(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://stocksense-h0n6.onrender.com",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -140,7 +159,9 @@ async def add_security_headers(request, call_next):
     return response
 
 # JWT Secret
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET environment variable must be set")
 JWT_ALGORITHM = "HS256"
 
 def create_jwt_token(data: dict) -> str:
@@ -273,13 +294,30 @@ def check_price_alerts_async():
     
     _refresh_executor.submit(_check)
 
+def prefetch_curated_stocks():
+    """Pre-fetch curated stock data for budget recommendations"""
+    try:
+        cache_key = f"curated_signals_{','.join(sorted(CURATED_STOCKS))}"
+        print("Pre-fetching curated stock data...")
+        all_signals = signals.get_all_signals(watchlist=CURATED_STOCKS)
+        set_cache(cache_key, all_signals, ttl=1800)  # Cache for 30 minutes
+        print(f"Pre-fetched {len(all_signals)} curated stock signals")
+    except Exception as e:
+        print(f"Error pre-fetching curated stocks: {e}")
+
 @app.on_event("startup")
 def startup_event():
     """Initialize database and clear cache - cache warms on first request"""
     _cache.clear()  # Clear cache on startup to ensure fresh data
     database.init_db()
     print("Database initialized, ready for requests")
-    
+
+    # Pre-fetch curated stock data in background
+    import threading
+    prefetch_thread = threading.Thread(target=prefetch_curated_stocks, daemon=True)
+    prefetch_thread.start()
+    print("Curated stock pre-fetching started in background")
+
     # Check and update prediction accuracy for due predictions
     try:
         due_predictions = database.get_predictions_due_for_check()
@@ -296,9 +334,8 @@ def startup_event():
                     print(f"  Error checking {pred.get('ticker')}: {e}")
     except Exception as e:
         print(f"Error checking prediction accuracy: {e}")
-    
+
     # Start periodic price alert checking (every 5 minutes)
-    import threading
     import time
     def periodic_price_alert_check():
         while True:
@@ -308,10 +345,24 @@ def startup_event():
             except Exception as e:
                 print(f"Periodic price alert check error: {e}")
                 time.sleep(300)
-    
+
     alert_thread = threading.Thread(target=periodic_price_alert_check, daemon=True)
     alert_thread.start()
     print("Periodic price alert checking started (every 5 minutes)")
+
+    # Start periodic curated stock refresh (every 30 minutes)
+    def periodic_curated_refresh():
+        while True:
+            try:
+                prefetch_curated_stocks()
+                time.sleep(1800)  # Refresh every 30 minutes
+            except Exception as e:
+                print(f"Periodic curated refresh error: {e}")
+                time.sleep(1800)
+
+    curated_thread = threading.Thread(target=periodic_curated_refresh, daemon=True)
+    curated_thread.start()
+    print("Periodic curated stock refresh started (every 30 minutes)")
 
 @app.get("/")
 def read_root():
@@ -320,24 +371,50 @@ def read_root():
 @app.get("/health")
 def health_check():
     """Health check endpoint for monitoring"""
+    from sqlalchemy import text
+    import datetime as dt
+    health_status = {
+        "status": "healthy",
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "checks": {}
+    }
+
+    # Check database connection
     try:
-        # Check database connection
-        session = SessionLocal()
-        session.execute("SELECT 1")
+        session = database.SessionLocal()
+        session.execute(text("SELECT 1"))
         session.close()
-        
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        health_status["checks"]["database"] = "connected"
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        health_status["status"] = "unhealthy"
+        health_status["checks"]["database"] = f"disconnected: {str(e)}"
+        logger.error(f"Database health check failed: {e}")
+    
+    # Check Redis connection
+    try:
+        if signals.redis_client:
+            signals.redis_client.ping()
+            health_status["checks"]["redis"] = "connected"
+        else:
+            health_status["checks"]["redis"] = "not_configured"
+    except Exception as e:
+        health_status["status"] = "unhealthy"
+        health_status["checks"]["redis"] = f"disconnected: {str(e)}"
+        logger.error(f"Redis health check failed: {e}")
+    
+    # Check external API (Finnhub)
+    try:
+        test_quote = signals.finnhub_client.quote("AAPL")
+        if test_quote and 'c' in test_quote:
+            health_status["checks"]["finnhub_api"] = "connected"
+        else:
+            health_status["checks"]["finnhub_api"] = "invalid_response"
+    except Exception as e:
+        health_status["status"] = "degraded"  # API down is not critical
+        health_status["checks"]["finnhub_api"] = f"disconnected: {str(e)}"
+        logger.warning(f"Finnhub API health check failed: {e}")
+    
+    return health_status
 
 @app.post("/signup")
 @limiter.limit("5/minute")
@@ -1228,9 +1305,20 @@ CURATED_STOCKS = [
 def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: List[str]) -> Dict[str, Any]:
     """Get AI-powered stock allocation based on goal and time horizon"""
     try:
-        # Get signals for the stock pool
-        all_signals = signals.get_all_signals(watchlist=stock_pool)
-        pool_signals = all_signals
+        # Use cached signals for curated list to avoid slow API calls
+        cache_key = f"curated_signals_{','.join(sorted(stock_pool))}"
+        cached_signals = get_cache(cache_key)
+        
+        if cached_signals:
+            pool_signals = cached_signals
+            logger.info("Using cached curated stock signals")
+        else:
+            # Get signals for the stock pool
+            all_signals = signals.get_all_signals(watchlist=stock_pool)
+            pool_signals = all_signals
+            # Cache for 5 minutes (300 seconds)
+            set_cache(cache_key, pool_signals, ttl=300)
+            logger.info("Fetched and cached curated stock signals")
         
         if not pool_signals:
             return {

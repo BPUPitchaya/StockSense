@@ -54,11 +54,15 @@ ETF_NAMES = {
 }
 
 # Initialize Finnhub client
-FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd879fr9r01ql0hskrd3gd879fr9r01ql0hskrd40')
+FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
+if not FINNHUB_API_KEY:
+    raise ValueError("FINNHUB_API_KEY environment variable must be set")
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
 # Redis cache connection with authentication
-REDIS_URL = os.getenv('REDIS_URL', 'redis://red-d89tjhq8qa3s73eb4320:JZGjlPWddeVHixHr7rcMBWuHt9Z7mhPD@red-d89tjhq8qa3s73eb4320:6379')
+REDIS_URL = os.getenv('REDIS_URL')
+if not REDIS_URL:
+    raise ValueError("REDIS_URL environment variable must be set")
 try:
     redis_client = redis.from_url(REDIS_URL, decode_responses=True)
     redis_client.ping()  # Test connection
@@ -274,7 +278,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
         try:
             _yfinance_delay()  # Enforce rate limiting
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period)
+            df = stock.history(period=period, timeout=30)
             if df.empty:
                 return None
             # Cache the result in Redis (15 min TTL)
@@ -760,12 +764,12 @@ def get_stock_info_finnhub(ticker: str) -> Optional[Dict]:
             print(f"Redis cache read failed: {e}")
     
     try:
-        # Get quote (current price)
+        # Get quote (current price) with timeout
         quote = finnhub_client.quote(ticker)
         if not quote or quote.get('c') is None:
             return None
         
-        # Get company profile
+        # Get company profile with timeout
         profile = finnhub_client.company_profile2(symbol=ticker)
         print(f"Finnhub profile for {ticker}: {profile}")
         

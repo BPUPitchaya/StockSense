@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import hashlib
 
 # Get database URL from environment variable, default to SQLite for local development
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///stock_portfolio.db')
+DATABASE_URL = os.getenv('DATABASE_URL') or 'sqlite:///stock_portfolio.db'
 
 # Create engine
 engine = create_engine(DATABASE_URL)
@@ -243,9 +243,11 @@ def verify_user(email: str, password: str) -> Optional[Dict]:
         session.close()
 
 def verify_admin(email: str, password: str) -> bool:
-    """Verify admin credentials (hardcoded for now)"""
-    ADMIN_EMAIL = "admin@admin.com"
-    ADMIN_PASSWORD = "1234"
+    """Verify admin credentials from environment variables"""
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        raise ValueError("ADMIN_EMAIL and ADMIN_PASSWORD environment variables must be set")
     return email == ADMIN_EMAIL and password == ADMIN_PASSWORD
 
 def get_all_users() -> Dict:
@@ -1215,7 +1217,7 @@ def create_stock_price_alert(user_id: int, ticker: str, target_price: float, con
             user_id=user_id,
             notification_type='stock_alert',
             title=f'Price Alert Set: {ticker.upper()}',
-            message=f'Alert set for {ticker.upper()} when price goes {condition_text} \${target_price:.2f}',
+            message=f'Alert set for {ticker.upper()} when price goes {condition_text} ${target_price:.2f}',
             ticker=ticker.upper(),
             target_price=target_price
         )

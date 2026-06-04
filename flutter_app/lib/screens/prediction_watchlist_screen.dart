@@ -176,17 +176,18 @@ class _PredictionWatchlistScreenState extends State<PredictionWatchlistScreen> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.end,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
+                                            horizontal: 6,
+                                            vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
                                             color: isPositive
                                                 ? Colors.green.withOpacity(0.1)
                                                 : Colors.red.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
                                             '${isPositive ? '+' : ''}${percentChange.toStringAsFixed(2)}%',
@@ -195,14 +196,17 @@ class _PredictionWatchlistScreenState extends State<PredictionWatchlistScreen> {
                                                   ? Colors.green
                                                   : Colors.red,
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 16,
+                                              fontSize: 14,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
+                                        const SizedBox(height: 4),
                                         IconButton(
                                           icon: const Icon(Icons.delete_outline),
                                           color: Colors.grey,
+                                          iconSize: 20,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
                                           onPressed: () =>
                                               _removeFromWatchlist(item['ticker']),
                                         ),

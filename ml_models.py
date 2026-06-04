@@ -1,3 +1,15 @@
+"""
+ML Models for Stock Prediction
+
+NOTE: This module is currently unused in the main application.
+It provides LSTM and Random Forest models for stock price prediction
+but is not integrated into the API endpoints. This code is kept for
+future integration if needed.
+
+To integrate, call EnsemblePredictor from signals.py or main.py
+and use the predict() method to generate ML-based signals.
+"""
+
 import yfinance as yf
 import pandas as pd
 import numpy as np

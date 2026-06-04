@@ -69,3 +69,50 @@ The prediction system uses:
 ## Watchlist
 
 Includes major S&P 500 stocks across technology, financial, healthcare, consumer, energy, and industrial sectors.
+
+## Deployment
+
+### Environment Variables
+
+The application requires the following environment variables. See `.env.example` for a template.
+
+- `DATABASE_URL` - PostgreSQL connection string (required for production)
+- `FINNHUB_API_KEY` - Finnhub API key for stock data
+- `REDIS_URL` - Redis connection string for caching
+- `JWT_SECRET` - Secret key for JWT token signing
+- `ADMIN_EMAIL` - Admin email for admin panel access
+- `ADMIN_PASSWORD` - Admin password for admin panel access
+- `ENVIRONMENT` - Set to `production` for production deployment
+
+### Render Deployment
+
+1. **Create a PostgreSQL database** on Render
+2. **Create a Redis instance** on Render
+3. **Set environment variables** in Render dashboard
+4. **Deploy the backend**:
+   - Connect your GitHub repository
+   - Set build command: `pip install -r requirements.txt`
+   - Set start command: `python main.py`
+5. **Deploy the frontend**:
+   - Build Flutter web app: `flutter build web --dart-define=GEMINI_API_KEY=your_key`
+   - Deploy the `flutter_app/build/web` directory to Render Static Sites
+
+### Local Development
+
+For local development, you can use SQLite (default) by not setting `DATABASE_URL`. Copy `.env.example` to `.env` and fill in the required values.
+
+```bash
+cp .env.example .env
+# Edit .env with your values
+./start.sh
+```
+
+## Health Check
+
+The application provides a health check endpoint at `/health` that returns:
+- Database connection status
+- Redis connection status
+- Finnhub API status
+- Overall system health
+
+Use this for monitoring and uptime checks.
