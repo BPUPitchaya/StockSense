@@ -727,6 +727,78 @@ def get_predictions_due_for_check() -> List[Dict]:
     except Exception as e:
         print(f"Error getting due predictions: {e}")
         return []
+
+def get_prediction_accuracy_statistics() -> Dict:
+    """Get overall prediction accuracy statistics"""
+    session = SessionLocal()
+    try:
+        from sqlalchemy import func
+        
+        # Get all predictions that have been checked (have actual price)
+        checked_predictions = session.query(PredictionHistory).filter(
+            PredictionHistory.actual_price.isnot(None)
+        ).all()
+        
+        total_checked = len(checked_predictions)
+        
+        if total_checked == 0:
+            return {
+                'total_predictions': 0,
+                'checked_predictions': 0,
+                'correct_direction_count': 0,
+                'direction_accuracy': 0.0,
+                'average_accuracy_percent': 0.0,
+                'by_ticker': []
+            }
+        
+        # Count correct direction predictions
+        correct_direction = sum(1 for p in checked_predictions if p.is_correct)
+        direction_accuracy = (correct_direction / total_checked) * 100
+        
+        # Calculate average accuracy percent
+        accuracy_percents = [p.accuracy_percent for p in checked_predictions if p.accuracy_percent is not None]
+        avg_accuracy = sum(accuracy_percents) / len(accuracy_percents) if accuracy_percents else 0.0
+        
+        # Get statistics by ticker
+        ticker_stats = session.query(
+            PredictionHistory.ticker,
+            func.count(PredictionHistory.id).label('total'),
+            func.sum(func.cast(PredictionHistory.is_correct, Integer)).label('correct')
+        ).filter(
+            PredictionHistory.actual_price.isnot(None)
+        ).group_by(PredictionHistory.ticker).all()
+        
+        by_ticker = []
+        for ticker, total, correct in ticker_stats:
+            ticker_accuracy = (correct / total * 100) if total > 0 else 0.0
+            by_ticker.append({
+                'ticker': ticker,
+                'total_predictions': total,
+                'correct_predictions': correct,
+                'accuracy_percent': ticker_accuracy
+            })
+        
+        # Sort by accuracy descending
+        by_ticker.sort(key=lambda x: x['accuracy_percent'], reverse=True)
+        
+        return {
+            'total_predictions': session.query(PredictionHistory).count(),
+            'checked_predictions': total_checked,
+            'correct_direction_count': correct_direction,
+            'direction_accuracy': round(direction_accuracy, 2),
+            'average_accuracy_percent': round(avg_accuracy, 2),
+            'by_ticker': by_ticker
+        }
+    except Exception as e:
+        print(f"Error getting prediction accuracy statistics: {e}")
+        return {
+            'total_predictions': 0,
+            'checked_predictions': 0,
+            'correct_direction_count': 0,
+            'direction_accuracy': 0.0,
+            'average_accuracy_percent': 0.0,
+            'by_ticker': []
+        }
     finally:
         session.close()
 

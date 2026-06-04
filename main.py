@@ -664,6 +664,15 @@ def get_admin_statistics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/admin/prediction-accuracy")
+def get_prediction_accuracy():
+    """Get prediction accuracy statistics"""
+    try:
+        accuracy_stats = database.get_prediction_accuracy_statistics()
+        return accuracy_stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/categories")
 def get_categories():
     """Get available stock categories"""
