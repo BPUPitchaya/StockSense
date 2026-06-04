@@ -131,7 +131,7 @@ if os.getenv("ENVIRONMENT") == "production":
 # Trusted host middleware (prevent host header attacks)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["stocksense-h0n6.onrender.com", "localhost", "127.0.0.1"]
+    allowed_hosts=["stocksense-h0n6.onrender.com", "stocksense-1-8xym.onrender.com", "localhost", "127.0.0.1"]
 )
 
 # Configure CORS
@@ -139,6 +139,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://stocksense-h0n6.onrender.com",
+        "https://stocksense-1-8xym.onrender.com",
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ],
