@@ -14,6 +14,8 @@ import 'screens/admin_dashboard_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/stock_alerts_screen.dart';
+import 'screens/terms_of_service_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
@@ -60,6 +62,8 @@ class _StockzAppState extends State<StockzApp> {
         '/notifications': (context) => const NotificationScreen(),
         '/notification-settings': (context) => const NotificationSettingsScreen(),
         '/stock-alerts': (context) => const StockAlertsScreen(),
+        '/terms-of-service': (context) => const TermsOfServiceScreen(),
+        '/privacy-policy': (context) => const PrivacyPolicyScreen(),
       },
     );
   }
