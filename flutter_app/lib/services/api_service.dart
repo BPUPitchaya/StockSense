@@ -701,4 +701,28 @@ class ApiService {
       throw Exception('Failed to delete stock alert: ${response.body}');
     }
   }
+
+  // Feedback methods
+  static Future<void> submitFeedback({
+    required String feedback,
+    required String category,
+    int? rating,
+  }) async {
+    final headers = await _getHeaders();
+    final body = {
+      'feedback': feedback,
+      'category': category,
+    };
+    if (rating != null) {
+      body['rating'] = rating;
+    }
+    final response = await http.post(
+      Uri.parse('$baseUrl/feedback'),
+      headers: headers,
+      body: json.encode(body),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to submit feedback: ${response.body}');
+    }
+  }
 }

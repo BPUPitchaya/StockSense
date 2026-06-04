@@ -26,6 +26,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+# Initialize Sentry for error logging
+import sentry_sdk
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -670,6 +681,38 @@ def get_prediction_accuracy():
     try:
         accuracy_stats = database.get_prediction_accuracy_statistics()
         return accuracy_stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FeedbackRequest(BaseModel):
+    feedback: str = Field(..., min_length=10, max_length=1000)
+    category: str = Field(..., description="bug, feature, general, other")
+    rating: Optional[int] = Field(None, ge=1, le=5)
+
+@app.post("/feedback")
+@limiter.limit("10/minute")
+def submit_feedback(request: Request, feedback: FeedbackRequest, authorization: str = Header(...)):
+    """Submit user feedback"""
+    try:
+        user_id = database.get_user_id_from_token(authorization)
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        # Store feedback in database (or log for now)
+        feedback_data = {
+            "user_id": user_id,
+            "feedback": feedback.feedback,
+            "category": feedback.category,
+            "rating": feedback.rating,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Log feedback (can be enhanced to store in database)
+        print(f"Feedback received: {feedback_data}")
+        
+        return {"message": "Feedback submitted successfully. Thank you!"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

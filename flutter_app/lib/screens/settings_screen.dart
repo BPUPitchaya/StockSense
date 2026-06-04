@@ -8,6 +8,7 @@ import 'user_profile_screen.dart';
 import 'notification_settings_screen.dart';
 import 'terms_of_service_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'feedback_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -219,6 +220,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             const Divider(),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.feedback),
+              title: const Text('Send Feedback'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FeedbackScreen()),
+                );
+              },
+            ),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.description),

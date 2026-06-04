@@ -13,3 +13,4 @@ pytz
 python-dotenv
 sendgrid
 slowapi
+sentry-sdk
