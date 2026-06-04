@@ -131,7 +131,7 @@ if os.getenv("ENVIRONMENT") == "production":
 # Trusted host middleware (prevent host header attacks)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["stocksense-h0n6.onrender.com", "stocksense-1-8xym.onrender.com", "localhost", "127.0.0.1"]
+    allowed_hosts=["stocksense-h0n6.onrender.com", "stock-sense-wheat.vercel.app", "localhost", "127.0.0.1"]
 )
 
 # Configure CORS
@@ -139,7 +139,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://stocksense-h0n6.onrender.com",
-        "https://stocksense-1-8xym.onrender.com",
+        "https://stock-sense-wheat.vercel.app",
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ],
@@ -434,10 +434,10 @@ def signup(request: Request, signup_request: SignupRequest):
             raise HTTPException(status_code=400, detail="Password must contain at least one digit")
         
         success = database.create_user(
-            request.email, 
-            request.password,
-            request.first_name,
-            request.last_name
+            signup_request.email,
+            signup_request.password,
+            signup_request.first_name,
+            signup_request.last_name
         )
         if success:
             return {"message": "User created successfully. You can now log in."}
