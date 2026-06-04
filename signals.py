@@ -59,17 +59,19 @@ if not FINNHUB_API_KEY:
     raise ValueError("FINNHUB_API_KEY environment variable must be set")
 finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
-# Redis cache connection with authentication
+# Redis cache connection with authentication (optional)
 REDIS_URL = os.getenv('REDIS_URL')
-if not REDIS_URL:
-    raise ValueError("REDIS_URL environment variable must be set")
-try:
-    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-    redis_client.ping()  # Test connection
-    print("Connected to Redis successfully")
-except Exception as e:
-    print(f"Redis connection failed, using local cache: {e}")
-    redis_client = None
+redis_client = None
+if REDIS_URL:
+    try:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()  # Test connection
+        print("Connected to Redis successfully")
+    except Exception as e:
+        print(f"Redis connection failed, using local cache: {e}")
+        redis_client = None
+else:
+    print("REDIS_URL not set, using local cache")
 
 # Fallback local caches if Redis unavailable
 _stock_info_cache: Dict[str, Dict] = {}
