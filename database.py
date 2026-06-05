@@ -117,6 +117,15 @@ class PredictionWatchlist(Base):
     added_date = Column(DateTime, default=datetime.utcnow)
     added_price = Column(Float, nullable=False)
 
+class Feedback(Base):
+    __tablename__ = 'feedback'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    feedback = Column(String, nullable=False)
+    category = Column(String, nullable=False)  # 'bug', 'feature', 'general', 'other'
+    rating = Column(Integer, nullable=True)  # 1-5 rating
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 def init_db():
     """Initialize the database"""
     try:
@@ -443,6 +452,59 @@ def get_system_info() -> Dict:
             'watchlist_count': watchlist_count,
             'database_url': os.getenv('DATABASE_URL', 'SQLite'),
         }
+    finally:
+        session.close()
+
+def get_user_id_from_token(authorization: str) -> Optional[int]:
+    """Extract user_id from JWT token"""
+    import jwt
+    JWT_SECRET = os.getenv("JWT_SECRET")
+    if not JWT_SECRET:
+        return None
+    
+    try:
+        token = authorization.replace("Bearer ", "")
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload.get("user_id")
+    except Exception:
+        return None
+
+def create_feedback(user_id: int, feedback: str, category: str, rating: Optional[int] = None) -> bool:
+    """Create a new feedback entry"""
+    session = SessionLocal()
+    try:
+        new_feedback = Feedback(
+            user_id=user_id,
+            feedback=feedback,
+            category=category,
+            rating=rating
+        )
+        session.add(new_feedback)
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def get_all_feedback() -> List[Dict]:
+    """Get all feedback for admin view"""
+    session = SessionLocal()
+    try:
+        feedback_list = session.query(Feedback, User).join(User, Feedback.user_id == User.id).order_by(Feedback.created_at.desc()).all()
+        return [
+            {
+                'id': feedback.id,
+                'user_id': feedback.user_id,
+                'user_email': user.email,
+                'feedback': feedback.feedback,
+                'category': feedback.category,
+                'rating': feedback.rating,
+                'created_at': feedback.created_at.isoformat() if feedback.created_at else None,
+            }
+            for feedback, user in feedback_list
+        ]
     finally:
         session.close()
 

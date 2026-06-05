@@ -712,6 +712,15 @@ def get_prediction_accuracy():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/admin/feedback")
+def get_all_feedback():
+    """Get all user feedback (admin only)"""
+    try:
+        feedback_list = database.get_all_feedback()
+        return {"feedback": feedback_list, "count": len(feedback_list)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class FeedbackRequest(BaseModel):
     feedback: str = Field(..., min_length=10, max_length=1000)
     category: str = Field(..., description="bug, feature, general, other")
@@ -726,17 +735,16 @@ def submit_feedback(request: Request, feedback: FeedbackRequest, authorization: 
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
-        # Store feedback in database (or log for now)
-        feedback_data = {
-            "user_id": user_id,
-            "feedback": feedback.feedback,
-            "category": feedback.category,
-            "rating": feedback.rating,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        # Store feedback in database
+        success = database.create_feedback(
+            user_id=user_id,
+            feedback=feedback.feedback,
+            category=feedback.category,
+            rating=feedback.rating
+        )
         
-        # Log feedback (can be enhanced to store in database)
-        print(f"Feedback received: {feedback_data}")
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to store feedback")
         
         return {"message": "Feedback submitted successfully. Thank you!"}
     except HTTPException:
