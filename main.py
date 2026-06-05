@@ -138,7 +138,8 @@ def convert_signals_to_predictions(signals_list):
     """Convert list of signals to predictions format"""
     return [signal_to_prediction(s) for s in signals_list]
 
-app = FastAPI()
+app = FastAPI(default_response_class=JSONResponse)
+app.json_encoder = NumpySafeEncoder
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
