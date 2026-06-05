@@ -29684,7 +29684,7 @@ return A.n(A.cT(),$async$Ma)
 case 3:p=c
 o=$.bO()
 s=4
-return A.n(A.dY(A.bo(o+"/signals?refresh=true"),p),$async$Ma)
+return A.n(A.dY(A.bo(o+"/signals"),p),$async$Ma)
 case 4:n=c
 if(n.b===200){o=J.df(B.J.aS(A.d3(A.d2(n.e)).aS(n.w)),new A.a4M(),t.O1)
 o=A.Z(o,o.$ti.i("aa.E"))
@@ -99436,7 +99436,7 @@ var $async$v1=A.A(function(a,b){if(a===1){p.push(b)
 s=q}for(;;)switch(s){case 0:o.C(new A.aA3(o))
 q=3
 s=6
-return A.n(A.iO(A.b([A.Ma(!0),A.iH()],t.mo),t.H),$async$v1)
+return A.n(A.iO(A.b([A.Ma(!1),A.iH()],t.mo),t.H),$async$v1)
 case 6:n=b
 if(o.c!=null)o.C(new A.aA4(o,n))
 q=1

@@ -38,7 +38,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
     setState(() { isLoading = true; error = null; searchedSignal = null; });
     try {
       final results = await Future.wait([
-        ApiService.getSignals(refresh: true),
+        ApiService.getSignals(refresh: false),
         CurrencyService.load(),
       ]);
       if (mounted) {
@@ -56,7 +56,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   String _formatPrice(double usdPrice, String? currency) {
     // If user prefers native currency and stock has a native currency, use it
-    if (CurrencyService.useNativeCurrency && currency != null && currency != 'USD') {
+    if (CurrencyService.useNativeCurrency && currency != null) {
       final currencySymbols = {
         'USD': '\$', 'AUD': 'A\$', 'NZD': 'NZ\$', 'GBP': '£',
         'EUR': '€', 'JPY': '¥', 'CNY': '¥', 'CAD': 'C\$',
