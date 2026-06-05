@@ -26,16 +26,22 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# Initialize Sentry for error logging
+# Initialize Sentry for error logging (optional, won't crash if not configured)
 import sentry_sdk
 SENTRY_DSN = os.getenv("SENTRY_DSN")
-if SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        traces_sample_rate=0.1,
-        profiles_sample_rate=0.1,
-        environment=os.getenv("ENVIRONMENT", "development"),
-    )
+if SENTRY_DSN and SENTRY_DSN.strip():
+    try:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+            environment=os.getenv("ENVIRONMENT", "development"),
+        )
+        print("Sentry initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize Sentry: {e}")
+else:
+    print("Sentry not configured (SENTRY_DSN not set)")
 
 # Configure logging
 logging.basicConfig(
