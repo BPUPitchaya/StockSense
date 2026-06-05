@@ -714,7 +714,7 @@ class ApiService {
       'category': category,
     };
     if (rating != null) {
-      body['rating'] = rating;
+      body['rating'] = rating.toString();
     }
     final response = await http.post(
       Uri.parse('$baseUrl/feedback'),
