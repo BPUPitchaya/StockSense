@@ -17,6 +17,7 @@ import time
 import jwt
 import os
 import json
+import math
 import hashlib
 import logging
 import numpy as np
@@ -68,9 +69,24 @@ class NumpySafeEncoder(json.JSONEncoder):
             return obj.tolist()
         return super().default(obj)
 
+def sanitize_nans(obj):
+    """Recursively replace NaN/Inf floats (plain or numpy) with None"""
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, (np.floating, np.integer)):
+        v = float(obj)
+        return None if (math.isnan(v) or math.isinf(v)) else v
+    if isinstance(obj, np.ndarray):
+        return [sanitize_nans(x) for x in obj.tolist()]
+    if isinstance(obj, dict):
+        return {k: sanitize_nans(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_nans(i) for i in obj]
+    return obj
+
 def clean_for_json(data):
-    """Strip numpy types by round-tripping through JSON"""
-    return json.loads(json.dumps(data, cls=NumpySafeEncoder))
+    """Strip numpy types and sanitize NaN/Inf values"""
+    return json.loads(json.dumps(sanitize_nans(data), cls=NumpySafeEncoder))
 
 def signal_to_prediction(signal_data):
     """Convert signal data to prediction format Flutter expects"""
