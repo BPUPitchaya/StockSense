@@ -56,6 +56,11 @@ class NumpySafeEncoder(json.JSONEncoder):
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.floating):
+            # Handle NaN and Inf values
+            if np.isnan(obj):
+                return None
+            if np.isinf(obj):
+                return None
             return float(obj)
         if isinstance(obj, np.bool_):
             return bool(obj)
