@@ -408,7 +408,7 @@ def startup_event():
 def read_root():
     return {"message": "StockSense API is running"}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
     """Health check endpoint for monitoring"""
     from sqlalchemy import text
