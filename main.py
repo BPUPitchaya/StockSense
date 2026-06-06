@@ -1378,7 +1378,7 @@ def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: L
     try:
         # Use cached signals for curated list to avoid slow API calls
         cache_key = f"curated_signals_{','.join(sorted(stock_pool))}"
-        cached_signals = get_cache(cache_key)
+        cached_signals, is_fresh = get_from_cache(cache_key, allow_stale=True, custom_duration=300)
         
         if cached_signals:
             pool_signals = cached_signals
@@ -1388,7 +1388,7 @@ def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: L
             all_signals = signals.get_all_signals(watchlist=stock_pool)
             pool_signals = all_signals
             # Cache for 5 minutes (300 seconds)
-            set_cache(cache_key, pool_signals, ttl=300)
+            set_cache(cache_key, pool_signals)
             logger.info("Fetched and cached curated stock signals")
         
         if not pool_signals:
