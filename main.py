@@ -340,7 +340,7 @@ def prefetch_curated_stocks():
         cache_key = f"curated_signals_{','.join(sorted(CURATED_STOCKS))}"
         print("Pre-fetching curated stock data...")
         all_signals = signals.get_all_signals(watchlist=CURATED_STOCKS)
-        set_cache(cache_key, all_signals, ttl=1800)  # Cache for 30 minutes
+        set_cache(cache_key, all_signals)  # Cache uses default duration
         print(f"Pre-fetched {len(all_signals)} curated stock signals")
     except Exception as e:
         print(f"Error pre-fetching curated stocks: {e}")

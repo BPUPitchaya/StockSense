@@ -463,12 +463,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        message,
+                        'No recommended stocks from your watchlist based on your investment criteria.',
                         style: const TextStyle(fontSize: 14),
                       ),
                       if (errorDetails != null) ...[
-                        const SizedBox(height: 12),
-                        _buildErrorDetails(errorDetails),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Reason: ${errorDetails['filter_reason'] ?? 'Stocks do not meet your investment criteria'}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
                       ],
                     ],
                   ),
