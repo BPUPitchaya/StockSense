@@ -1293,25 +1293,7 @@ def get_prediction_watchlist(request: Request, authorization: str = Header(...))
         payload = verify_jwt_token(authorization)
         user_id = payload.get("user_id")
         
-        # Get regular watchlist
-        regular_watchlist = database.get_personal_watchlist(user_id=user_id)
-        
         # Get prediction watchlist
-        prediction_watchlist = database.get_prediction_watchlist(user_id=user_id)
-        prediction_tickers = {item['ticker'] for item in prediction_watchlist}
-        
-        # Migrate any stocks in regular watchlist that aren't in prediction watchlist
-        for ticker in regular_watchlist:
-            if ticker not in prediction_tickers:
-                try:
-                    stock_info = signals.get_stock_info_finnhub(ticker)
-                    current_price = stock_info.get('current_price') if stock_info else None
-                    if current_price:
-                        database.add_to_prediction_watchlist(ticker, current_price, user_id=user_id)
-                except:
-                    pass
-        
-        # Re-fetch prediction watchlist after migration
         watchlist = database.get_prediction_watchlist(user_id=user_id)
         
         # Get current prices and calculate performance
