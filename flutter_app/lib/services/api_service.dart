@@ -163,6 +163,16 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getAdminFeedback() async {
+    final response = await http.get(Uri.parse('$baseUrl/admin/feedback'));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get admin feedback: ${response.body}');
+    }
+  }
+
   static Future<Map<String, String>> _getHeaders() async {
     final token = await _getToken();
     final headers = {'Content-Type': 'application/json'};

@@ -273,7 +273,14 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                 label: Text(ticker),
                 deleteIcon: const Icon(Icons.close),
                 onDeleted: () => _removeFromPersonalWatchlist(ticker),
-                backgroundColor: Colors.blue.shade100,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey.shade700
+                    : Colors.blue.shade100,
+                labelStyle: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                ),
               )).toList(),
             ),
           ),

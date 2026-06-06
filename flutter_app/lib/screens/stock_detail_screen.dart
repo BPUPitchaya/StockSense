@@ -73,7 +73,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final nativeCurrency = stockInfo?['currency'] as String?;
     
     // If user prefers native currency and stock has a native currency, use it
-    if (CurrencyService.useNativeCurrency && nativeCurrency != null && nativeCurrency != 'USD') {
+    if (CurrencyService.useNativeCurrency && nativeCurrency != null) {
       final sym = _currencySymbols[nativeCurrency] ?? nativeCurrency;
       if (nativeCurrency == 'JPY' || nativeCurrency == 'KRW') {
         return '$sym${price.toStringAsFixed(0)}';

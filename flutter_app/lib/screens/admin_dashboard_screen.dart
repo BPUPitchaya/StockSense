@@ -13,6 +13,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Map<String, dynamic> _statistics = {};
   List<dynamic> _users = [];
+  List<dynamic> _feedback = [];
   bool _isLoading = true;
   String? _errorMessage;
   final TextEditingController _apiUrlController = TextEditingController();
@@ -50,9 +51,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final stats = await ApiService.getAdminStatistics();
       final users = await ApiService.getAllUsers();
+      final feedback = await ApiService.getAdminFeedback();
       setState(() {
         _statistics = stats;
         _users = users['users'] ?? [];
+        _feedback = feedback['feedback'] ?? [];
         _isLoading = false;
       });
     } catch (e) {
@@ -135,6 +138,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     _buildDashboardTab(),
                     _buildUsersTab(),
                     _buildStocksTab(),
+                    _buildFeedbackTab(),
                     _buildSystemTab(),
                   ],
                 ),
@@ -154,6 +158,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.trending_up),
             label: 'Stocks',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.feedback),
+            label: 'Feedback',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
@@ -434,6 +442,111 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFeedbackTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('User Feedback (${_feedback.length})', style: Theme.of(context).textTheme.titleMedium),
+              TextButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _feedback.isEmpty
+              ? const Center(child: Text('No feedback yet'))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _feedback.length,
+                  itemBuilder: (context, index) {
+                    final item = _feedback[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item['user_email'] ?? 'Unknown',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (item['rating'] != null)
+                                  Row(
+                                    children: List.generate(5, (starIndex) {
+                                      return Icon(
+                                        starIndex < item['rating'] ? Icons.star : Icons.star_border,
+                                        size: 16,
+                                        color: Colors.amber,
+                                      );
+                                    }),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatDate(item['created_at']),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _getCategoryColor(item['category']).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                item['category']?.toUpperCase() ?? 'OTHER',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getCategoryColor(item['category']),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              item['feedback'] ?? '',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCategoryColor(String? category) {
+    switch (category?.toLowerCase()) {
+      case 'bug':
+        return Colors.red;
+      case 'feature':
+        return Colors.blue;
+      case 'general':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildSystemTab() {
