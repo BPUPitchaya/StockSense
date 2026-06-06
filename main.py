@@ -1368,9 +1368,9 @@ CURATED_STOCKS = [
     'SPY', 'QQQ', 'VTI', 'VOO', 'IWM', 'GLD', 'TLT',
     # Popular blue-chip stocks
     'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-    'BRK.B', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA',
-    # Sector ETFs
-    'XLK', 'XLF', 'XLV', 'XLE', 'XLI', 'XLU', 'XLRE',
+    'BRK-B', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA',
+    # Key sector ETFs (reduced to avoid rate limits)
+    'XLK', 'XLF', 'XLV',
 ]
 
 def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: List[str]) -> Dict[str, Any]:
@@ -1379,7 +1379,7 @@ def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: L
         # Use cached signals for curated list to avoid slow API calls
         cache_key = f"curated_signals_{','.join(sorted(stock_pool))}"
         cached_signals, is_fresh = get_from_cache(cache_key, allow_stale=True, custom_duration=300)
-        
+
         if cached_signals:
             pool_signals = cached_signals
             logger.info("Using cached curated stock signals")
@@ -1390,50 +1390,76 @@ def get_ai_allocation(budget: float, goal: str, time_horizon: str, stock_pool: L
             # Cache for 5 minutes (300 seconds)
             set_cache(cache_key, pool_signals)
             logger.info("Fetched and cached curated stock signals")
-        
+
         if not pool_signals:
             return {
                 "total_budget": budget,
                 "total_allocated": 0.0,
                 "remaining_budget": budget,
                 "recommendations": [],
-                "message": "No valid stocks found in the selected pool"
+                "message": f"No valid stocks found in the selected pool. Tried to fetch signals for: {', '.join(stock_pool)}"
             }
-        
+
         # Determine risk profile based on time horizon
         horizon_years = int(time_horizon)
         if horizon_years <= 1:
             # Short-term: Conservative - focus on stability
-            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Hold']]
+            allowed_signals = ['Buy', 'Hold']
+            pool_signals = [s for s in pool_signals if s.get('signal') in allowed_signals]
             risk_multiplier = 0.5
+            filter_reason = f"Short-term ({horizon_years} year) - only showing Buy/Hold signals for stability"
         elif horizon_years <= 3:
             # Medium-term: Balanced
-            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Strong Buy', 'Hold']]
+            allowed_signals = ['Buy', 'Strong Buy', 'Hold']
+            pool_signals = [s for s in pool_signals if s.get('signal') in allowed_signals]
             risk_multiplier = 1.0
+            filter_reason = f"Medium-term ({horizon_years} years) - showing Buy/Strong Buy/Hold signals"
         else:
             # Long-term: Aggressive - focus on growth
-            pool_signals = [s for s in pool_signals if s.get('signal') in ['Buy', 'Strong Buy']]
+            allowed_signals = ['Buy', 'Strong Buy']
+            pool_signals = [s for s in pool_signals if s.get('signal') in allowed_signals]
             risk_multiplier = 1.5
-        
+            filter_reason = f"Long-term ({horizon_years} years) - only showing Buy/Strong Buy for growth"
+
+        # Track filtered stocks for error message
+        all_signals_cached = cached_signals if cached_signals else signals.get_all_signals(watchlist=stock_pool)
+        filtered_stocks = []
+        if all_signals_cached:
+            for s in all_signals_cached:
+                if s.get('signal') not in allowed_signals:
+                    filtered_stocks.append({
+                        'ticker': s.get('ticker', 'Unknown'),
+                        'signal': s.get('signal', 'Unknown'),
+                        'reason': f"Signal '{s.get('signal')}' not in allowed list: {', '.join(allowed_signals)}"
+                    })
+
         # Sort by score (combination of signal strength and momentum)
         def score_signal(s):
             signal_score = {'Strong Buy': 3, 'Buy': 2, 'Hold': 1}.get(s.get('signal', 'Hold'), 0)
             momentum = abs(s.get('percent_change', 0))
             return (signal_score * risk_multiplier) + (momentum * 0.1)
-        
+
         pool_signals.sort(key=score_signal, reverse=True)
-        
+
         # Select top stocks (5-7 depending on pool size)
         num_stocks = min(len(pool_signals), 7)
         top_picks = pool_signals[:num_stocks]
-        
+
         if not top_picks:
+            error_details = {
+                "filter_reason": filter_reason,
+                "allowed_signals": allowed_signals,
+                "filtered_stocks": filtered_stocks[:10],  # Show first 10 filtered stocks
+                "total_analyzed": len(all_signals_cached) if all_signals_cached else 0,
+                "total_filtered": len(filtered_stocks)
+            }
             return {
                 "total_budget": budget,
                 "total_allocated": 0.0,
                 "remaining_budget": budget,
                 "recommendations": [],
-                "message": "No suitable stocks found for your criteria"
+                "message": f"No suitable stocks found for your criteria. {filter_reason}.",
+                "error_details": error_details
             }
         
         # Calculate allocation percentages

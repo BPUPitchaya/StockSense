@@ -320,9 +320,93 @@ class _BudgetScreenState extends State<BudgetScreen> {
   /// Format a USD amount using the current user currency (rates are loaded before this is called)
   String _fmtBudget(double usdAmount) => CurrencyService.format(usdAmount);
 
+  Widget _buildErrorDetails(Map<String, dynamic> errorDetails) {
+    final filterReason = errorDetails['filter_reason'] as String?;
+    final allowedSignals = errorDetails['allowed_signals'] as List<dynamic>? ?? [];
+    final filteredStocks = errorDetails['filtered_stocks'] as List<dynamic>? ?? [];
+    final totalAnalyzed = errorDetails['total_analyzed'] as int? ?? 0;
+    final totalFiltered = errorDetails['total_filtered'] as int? ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (filterReason != null) ...[
+            Text(
+              'Filter Reason:',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 4),
+            Text(filterReason, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 8),
+          ],
+          if (allowedSignals.isNotEmpty) ...[
+            Text(
+              'Allowed Signals:',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: allowedSignals.map((signal) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(signal.toString(), style: const TextStyle(fontSize: 12)),
+              )).toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            'Analyzed: $totalAnalyzed stocks, Filtered: $totalFiltered stocks',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          if (filteredStocks.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Filtered Stocks (showing first 10):',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 4),
+            ...filteredStocks.take(10).map((stock) {
+              final stockData = stock as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      '${stockData['ticker']}: ',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${stockData['signal']} - ${stockData['reason']}',
+                        style: const TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecommendations() {
     final recommendations = _recommendations!;
     final stockRecommendations = recommendations['recommendations'] as List<dynamic>? ?? [];
+    final message = recommendations['message'] as String?;
+    final errorDetails = recommendations['error_details'] as Map<String, dynamic>?;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -350,14 +434,56 @@ class _BudgetScreenState extends State<BudgetScreen> {
               style: const TextStyle(fontSize: 16, color: Colors.orange),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Recommended Stocks:',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            if (stockRecommendations.isEmpty) ...[
+              if (message != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No Recommendations Available',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        message,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      if (errorDetails != null) ...[
+                        const SizedBox(height: 12),
+                        _buildErrorDetails(errorDetails),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ] else ...[
+              const Text(
+                'Recommended Stocks:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             ...stockRecommendations.map((rec) {
               final stock = rec as Map<String, dynamic>;
               return Card(
