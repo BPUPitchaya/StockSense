@@ -179,6 +179,7 @@ app.add_middleware(
     allow_origins=[
         "https://stocksense-h0n6.onrender.com",
         "https://stock-sense-wheat.vercel.app",
+        "https://stock-sense-*.vercel.app",  # Allow all Vercel preview deployments
         "http://localhost:8080",
         "http://127.0.0.1:8080"
     ],
