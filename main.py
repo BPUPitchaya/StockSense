@@ -757,6 +757,23 @@ def get_categories():
     """Get available stock categories"""
     return {"categories": list(signals.CATEGORIES.keys())}
 
+@app.get("/stocks/available")
+@limiter.limit("30/minute")
+def get_available_stocks(request: Request):
+    """Get all available stocks for comparison (curated list)"""
+    try:
+        cache_key = f"curated_signals_{','.join(sorted(CURATED_STOCKS))}"
+        cached_signals, is_fresh = get_from_cache(cache_key, allow_stale=True, custom_duration=300)
+        
+        if cached_signals:
+            return cached_signals
+        else:
+            all_signals = signals.get_all_signals(watchlist=CURATED_STOCKS)
+            set_cache(cache_key, all_signals)
+            return all_signals
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/signals")
 @limiter.limit("30/minute")
 def get_signals(request: Request, category: Optional[str] = None, refresh: bool = False):
