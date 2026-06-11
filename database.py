@@ -216,13 +216,14 @@ def create_user(email: str, password: str, first_name: str = None, last_name: st
         if existing_user:
             return False
         
-        # Create new user
+        # Create new user (verified by default - email verification disabled until domain is available)
         password_hash = hash_password(password)
         new_user = User(
             email=email, 
             password_hash=password_hash,
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
+            is_verified=True
         )
         session.add(new_user)
         session.commit()
@@ -1015,23 +1016,24 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
         session.close()
 
 def send_verification_email(email: str, token: str, token_type: str = 'email_verification') -> bool:
-    """Send verification or password reset email using SendGrid"""
+    """Send verification or password reset email using Resend"""
     import os
     from dotenv import load_dotenv
-    from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail
+    import resend
     
     load_dotenv()
     
-    # SendGrid API key
-    sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
-    sender_email = os.getenv('SMTP_USERNAME', 'noreply@stocksense.app')
+    # Resend API key
+    resend_api_key = os.getenv('RESEND_API_KEY', 're_4nVA31fD_DjQbyGaQV9JAFGeVEfEgigk5')
+    sender_email = os.getenv('SMTP_USERNAME', 'onboarding@resend.dev')
     
-    if not sendgrid_api_key:
-        print("SendGrid API key not configured")
+    if not resend_api_key:
+        print("Resend API key not configured")
         return False
     
     try:
+        resend.api_key = resend_api_key
+        
         # Create email content
         if token_type == 'email_verification':
             subject = "Verify your StockSense account"
@@ -1062,28 +1064,25 @@ def send_verification_email(email: str, token: str, token_type: str = 'email_ver
             </html>
             """
         
-        # Create SendGrid message
-        message = Mail(
-            from_email=sender_email,
-            to_emails=email,
-            subject=subject,
-            html_content=html_content
-        )
+        # Send email via Resend
+        print(f"Attempting to send email to {email} via Resend")
+        params = {
+            "from": sender_email,
+            "to": [email],
+            "subject": subject,
+            "html": html_content,
+        }
         
-        # Send email
-        print(f"Attempting to send email to {email} via SendGrid")
-        sg = SendGridAPIClient(sendgrid_api_key)
-        response = sg.send(message)
+        response = resend.Emails.send(params)
         
-        if response.status_code in [200, 202]:
+        if response.get('id'):
             print(f"Email sent to {email} successfully")
             return True
         else:
-            print(f"SendGrid returned status code: {response.status_code}")
-            print(f"Response body: {response.body}")
+            print(f"Resend returned error: {response}")
             return False
     except Exception as e:
-        print(f"Error sending email via SendGrid: {e}")
+        print(f"Error sending email via Resend: {e}")
         return False
 
 def add_to_prediction_watchlist(ticker: str, added_price: float, user_id: int = None) -> bool:

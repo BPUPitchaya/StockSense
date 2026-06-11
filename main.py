@@ -460,7 +460,7 @@ def health_check():
 @app.post("/signup")
 @limiter.limit("5/minute")
 def signup(request: Request, signup_request: SignupRequest):
-    """User signup endpoint - email verification temporarily disabled"""
+    """User signup endpoint - email verification disabled until domain is available"""
     try:
         # Password validation
         password = signup_request.password
@@ -491,11 +491,10 @@ def signup(request: Request, signup_request: SignupRequest):
 @app.post("/login")
 @limiter.limit("10/minute")
 def login(request: Request, login_request: LoginRequest):
-    """User login endpoint - email verification check temporarily disabled"""
+    """User login endpoint - email verification disabled until domain is available"""
     try:
         user = database.verify_user(login_request.email, login_request.password)
         if user:
-            # Email verification check temporarily disabled
             token = create_jwt_token({"sub": user['email'], "user_id": user['id']})
             return {
                 "access_token": token,
