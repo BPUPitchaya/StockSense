@@ -17,6 +17,7 @@ import 'screens/stock_alerts_screen.dart';
 import 'screens/terms_of_service_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/feedback_screen.dart';
+import 'screens/landing_screen.dart';
 import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
@@ -53,11 +54,12 @@ class _StockzAppState extends State<StockzApp> {
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {
-        '/': (context) => const AuthChecker(),
+        '/': (context) => const LandingScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
         '/reset-password': (context) => const ResetPasswordScreen(),
         '/home': (context) => const MainScreen(),
+        '/auth-check': (context) => const AuthChecker(),
         '/admin-login': (context) => const AdminLoginScreen(),
         '/admin-dashboard': (context) => const AdminDashboardScreen(),
         '/notifications': (context) => const NotificationScreen(),
