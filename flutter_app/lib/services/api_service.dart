@@ -37,7 +37,12 @@ class ApiService {
       await _saveToken(data['access_token']);
       return data;
     } else {
-      throw Exception('Login failed: ${response.body}');
+      try {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['detail'] ?? 'Login failed');
+      } catch (e) {
+        throw Exception('Login failed');
+      }
     }
   }
 
@@ -62,7 +67,12 @@ class ApiService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Signup failed: ${response.body}');
+      try {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['detail'] ?? 'Signup failed');
+      } catch (e) {
+        throw Exception('Signup failed');
+      }
     }
   }
 
@@ -192,6 +202,18 @@ class ApiService {
       return data.map((json) => Signal.fromJson(json)).toList();
     } else {
       throw Exception('Failed to get signals: ${response.body}');
+    }
+  }
+
+  static Future<List<Signal>> getAvailableStocks() async {
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/stocks/available'), headers: headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Signal.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to get available stocks: ${response.body}');
     }
   }
 

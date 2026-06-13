@@ -465,13 +465,13 @@ def signup(request: Request, signup_request: SignupRequest):
         # Password validation
         password = signup_request.password
         if len(password) < 8:
-            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
         if not any(c.isupper() for c in password):
-            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+            raise HTTPException(status_code=400, detail="Password must contain an uppercase letter")
         if not any(c.islower() for c in password):
-            raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+            raise HTTPException(status_code=400, detail="Password must contain a lowercase letter")
         if not any(c.isdigit() for c in password):
-            raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+            raise HTTPException(status_code=400, detail="Password must contain a number")
         
         success = database.create_user(
             signup_request.email,
@@ -480,9 +480,9 @@ def signup(request: Request, signup_request: SignupRequest):
             signup_request.last_name
         )
         if success:
-            return {"message": "User created successfully. You can now log in."}
+            return {"message": "Account created successfully"}
         else:
-            raise HTTPException(status_code=400, detail="An account with this email already exists. Please try logging in or use a different email.")
+            raise HTTPException(status_code=400, detail="User already exists")
     except HTTPException:
         raise
     except Exception as e:
@@ -502,7 +502,7 @@ def login(request: Request, login_request: LoginRequest):
                 "user": user
             }
         else:
-            raise HTTPException(status_code=401, detail="Invalid email or password. Please check your credentials and try again.")
+            raise HTTPException(status_code=401, detail="Invalid email or password")
     except HTTPException:
         raise
     except Exception as e:

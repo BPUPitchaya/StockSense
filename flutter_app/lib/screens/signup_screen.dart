@@ -29,25 +29,25 @@ class _SignupScreenState extends State<SignupScreen> {
     final password = _passwordController.text;
     if (password.length < 8) {
       setState(() {
-        errorMessage = 'Password must be at least 8 characters long';
+        errorMessage = 'Password must be at least 8 characters';
       });
       return;
     }
     if (!password.contains(RegExp(r'[A-Z]'))) {
       setState(() {
-        errorMessage = 'Password must contain at least one uppercase letter';
+        errorMessage = 'Password must contain an uppercase letter';
       });
       return;
     }
     if (!password.contains(RegExp(r'[a-z]'))) {
       setState(() {
-        errorMessage = 'Password must contain at least one lowercase letter';
+        errorMessage = 'Password must contain a lowercase letter';
       });
       return;
     }
     if (!password.contains(RegExp(r'[0-9]'))) {
       setState(() {
-        errorMessage = 'Password must contain at least one digit';
+        errorMessage = 'Password must contain a number';
       });
       return;
     }
