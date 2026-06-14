@@ -1250,21 +1250,21 @@ def get_projection(ticker: str, period: str = "1y"):
             projected_price = last_price * (1 + daily_change) + wave + noise
             projection.append({
                 'day': day,
-                'price': projected_price
+                'price': float(projected_price)
             })
             last_price = projected_price
         
         return {
             'ticker': ticker,
-            'current_price': current_price,
-            'score': score,
-            'daily_change_pct': daily_change * 100,
+            'current_price': float(current_price),
+            'score': float(score),
+            'daily_change_pct': float(daily_change * 100),
             'projection': projection,
             'indicators': {
-                'rsi': rsi,
-                'macd_above_signal': macd_above,
+                'rsi': float(rsi),
+                'macd_above_signal': bool(macd_above),
                 'trend_strength': trend_strength,
-                'adx': adx_value
+                'adx': float(adx_value)
             }
         }
     except HTTPException:
