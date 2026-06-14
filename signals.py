@@ -280,7 +280,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> Optional[pd.DataFrame]:
         try:
             _yfinance_delay()  # Enforce rate limiting
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period, timeout=30)
+            df = stock.history(period=period, timeout=90)
             if df.empty:
                 return None
             # Cache the result in Redis (15 min TTL)

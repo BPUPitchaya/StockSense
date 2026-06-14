@@ -14,3 +14,4 @@ python-dotenv
 resend
 slowapi
 sentry-sdk
+google-generativeai

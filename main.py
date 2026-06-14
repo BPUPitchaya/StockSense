@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import google.generativeai as genai
 
 # Initialize Sentry for error logging (optional, won't crash if not configured)
 import sentry_sdk
@@ -970,6 +971,122 @@ def get_stock_info_endpoint(ticker: str):
         return stock_info
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AIAnalysisRequest(BaseModel):
+    ticker: str
+    owns_stock: bool = False
+    rsi: Optional[float] = None
+    ma50: Optional[float] = None
+    ma200: Optional[float] = None
+    signal: Optional[str] = None
+    current_price: Optional[float] = None
+
+@app.post("/ai-analysis")
+@limiter.limit("30/minute")
+def get_ai_analysis(request: Request, analysis_request: AIAnalysisRequest):
+    """Get AI stock analysis with caching and fallback to rule-based analysis"""
+    try:
+        # Check cache first
+        cached_analysis = database.get_cached_analysis(
+            ticker=analysis_request.ticker,
+            owns_stock=analysis_request.owns_stock,
+            rsi=analysis_request.rsi,
+            ma50=analysis_request.ma50,
+            ma200=analysis_request.ma200,
+            signal=analysis_request.signal
+        )
+        
+        if cached_analysis:
+            return {"analysis": cached_analysis, "source": "cache"}
+        
+        # Try Gemini AI
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        if GEMINI_API_KEY:
+            try:
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')
+                
+                ownership_context = (
+                    "The user currently OWNS this stock. Provide specific advice on whether to HOLD or SELL based on the metrics."
+                    if analysis_request.owns_stock
+                    else "The user does NOT own this stock. Provide specific advice on whether to BUY or AVOID based on the metrics."
+                )
+                
+                prompt = f"""
+Analyze the stock {analysis_request.ticker} with these metrics:
+- Current Price: {analysis_request.current_price}
+- Signal: {analysis_request.signal}
+- RSI: {analysis_request.rsi}
+- 50-day MA: {analysis_request.ma50}
+- 200-day MA: {analysis_request.ma200}
+
+{ownership_context}
+
+IMPORTANT: You MUST start your response with a clear recommendation section.
+
+Provide a brief structured analysis with EXACTLY these headers in this order:
+
+## Recommendation
+[State clearly: BUY, SELL, HOLD, or AVOID based on whether the user owns the stock]
+
+## Strengths
+[list 2-3 key strengths]
+
+## Risks
+[list 2-3 key risks]
+
+## Outlook
+[brief outlook]
+
+Keep it concise (under 150 words total).
+"""
+                
+                response = model.generate_content(prompt)
+                analysis = response.text
+                
+                # Save to cache
+                database.save_analysis_cache(
+                    ticker=analysis_request.ticker,
+                    owns_stock=analysis_request.owns_stock,
+                    analysis=analysis,
+                    rsi=analysis_request.rsi,
+                    ma50=analysis_request.ma50,
+                    ma200=analysis_request.ma200,
+                    signal=analysis_request.signal
+                )
+                
+                return {"analysis": analysis, "source": "gemini"}
+            except Exception as e:
+                print(f"Gemini API error: {e}")
+                # Fall through to rule-based analysis
+        
+        # Fallback to rule-based analysis
+        rule_analysis = database.get_rule_based_analysis(
+            ticker=analysis_request.ticker,
+            owns_stock=analysis_request.owns_stock,
+            rsi=analysis_request.rsi,
+            ma50=analysis_request.ma50,
+            ma200=analysis_request.ma200,
+            signal=analysis_request.signal,
+            current_price=analysis_request.current_price
+        )
+        
+        # Save rule-based analysis to cache (shorter duration)
+        database.save_analysis_cache(
+            ticker=analysis_request.ticker,
+            owns_stock=analysis_request.owns_stock,
+            analysis=rule_analysis,
+            rsi=analysis_request.rsi,
+            ma50=analysis_request.ma50,
+            ma200=analysis_request.ma200,
+            signal=analysis_request.signal,
+            cache_hours=1  # Cache rule-based for only 1 hour
+        )
+        
+        return {"analysis": rule_analysis, "source": "rule-based"}
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

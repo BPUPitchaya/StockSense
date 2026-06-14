@@ -69,8 +69,12 @@ class ApiService {
     } else {
       try {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['detail'] ?? 'Signup failed');
+        final errorMessage = errorData['detail'] ?? 'Signup failed';
+        throw Exception(errorMessage);
       } catch (e) {
+        if (e is Exception) {
+          rethrow;
+        }
         throw Exception('Signup failed');
       }
     }

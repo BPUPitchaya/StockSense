@@ -126,6 +126,19 @@ class Feedback(Base):
     rating = Column(Integer, nullable=True)  # 1-5 rating
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class AIAnalysisCache(Base):
+    __tablename__ = 'ai_analysis_cache'
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, nullable=False, index=True)
+    owns_stock = Column(Boolean, nullable=False)
+    rsi = Column(Float, nullable=True)
+    ma50 = Column(Float, nullable=True)
+    ma200 = Column(Float, nullable=True)
+    signal = Column(String, nullable=True)
+    analysis = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
 def init_db():
     """Initialize the database"""
     try:
@@ -508,6 +521,138 @@ def get_all_feedback() -> List[Dict]:
         ]
     finally:
         session.close()
+
+def get_cached_analysis(ticker: str, owns_stock: bool, rsi: float = None, ma50: float = None, ma200: float = None, signal: str = None) -> Optional[str]:
+    """Get cached AI analysis if available and not expired"""
+    session = SessionLocal()
+    try:
+        from datetime import datetime
+        
+        # Delete expired entries
+        session.query(AIAnalysisCache).filter(AIAnalysisCache.expires_at < datetime.utcnow()).delete()
+        session.commit()
+        
+        # Try to find matching cache entry
+        cache = session.query(AIAnalysisCache).filter(
+            AIAnalysisCache.ticker == ticker,
+            AIAnalysisCache.owns_stock == owns_stock,
+            AIAnalysisCache.expires_at >= datetime.utcnow()
+        ).order_by(AIAnalysisCache.created_at.desc()).first()
+        
+        if cache:
+            return cache.analysis
+        return None
+    finally:
+        session.close()
+
+def save_analysis_cache(ticker: str, owns_stock: bool, analysis: str, rsi: float = None, ma50: float = None, ma200: float = None, signal: str = None, cache_hours: int = 24) -> bool:
+    """Save AI analysis to cache"""
+    session = SessionLocal()
+    try:
+        from datetime import datetime, timedelta
+        
+        expires_at = datetime.utcnow() + timedelta(hours=cache_hours)
+        
+        cache_entry = AIAnalysisCache(
+            ticker=ticker,
+            owns_stock=owns_stock,
+            rsi=rsi,
+            ma50=ma50,
+            ma200=ma200,
+            signal=signal,
+            analysis=analysis,
+            expires_at=expires_at
+        )
+        session.add(cache_entry)
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        print(f"Error saving analysis cache: {e}")
+        return False
+    finally:
+        session.close()
+
+def get_rule_based_analysis(ticker: str, owns_stock: bool, rsi: float = None, ma50: float = None, ma200: float = None, signal: str = None, current_price: float = None) -> str:
+    """Generate rule-based analysis as fallback when AI is unavailable"""
+    recommendation = "HOLD"
+    strengths = []
+    risks = []
+    
+    # RSI analysis
+    if rsi:
+        if rsi < 30:
+            strengths.append(f"RSI ({rsi:.1f}) indicates oversold conditions")
+            if not owns_stock:
+                recommendation = "BUY"
+        elif rsi > 70:
+            risks.append(f"RSI ({rsi:.1f}) indicates overbought conditions")
+            if owns_stock:
+                recommendation = "SELL"
+        else:
+            strengths.append(f"RSI ({rsi:.1f}) is in neutral zone")
+    
+    # Moving average analysis
+    if ma50 and ma200:
+        if current_price:
+            if current_price > ma50 > ma200:
+                strengths.append("Price above both 50-day and 200-day MA (strong uptrend)")
+                if not owns_stock:
+                    recommendation = "BUY"
+            elif current_price < ma50 < ma200:
+                risks.append("Price below both 50-day and 200-day MA (downtrend)")
+                if owns_stock:
+                    recommendation = "SELL"
+            elif current_price > ma50 < ma200:
+                strengths.append("Price above 50-day MA (short-term bullish)")
+            elif current_price < ma50 > ma200:
+                risks.append("Price below 50-day MA (short-term bearish)")
+    
+    # Signal analysis
+    if signal:
+        if signal in ["Buy", "Strong Buy"]:
+            strengths.append(f"Technical signal: {signal}")
+            if not owns_stock and recommendation == "HOLD":
+                recommendation = "BUY"
+        elif signal in ["Sell", "Strong Sell"]:
+            risks.append(f"Technical signal: {signal}")
+            if owns_stock and recommendation == "HOLD":
+                recommendation = "SELL"
+    
+    # Adjust recommendation based on ownership
+    if owns_stock and recommendation == "BUY":
+        recommendation = "HOLD"
+    elif not owns_stock and recommendation == "SELL":
+        recommendation = "HOLD"
+    
+    # Build analysis text
+    analysis = f"""## Recommendation
+{recommendation}
+
+## Strengths
+"""
+    if strengths:
+        for strength in strengths:
+            analysis += f"- {strength}\n"
+    else:
+        analysis += "- Limited technical strength indicators\n"
+    
+    analysis += "\n## Risks\n"
+    if risks:
+        for risk in risks:
+            analysis += f"- {risk}\n"
+    else:
+        analysis += "- Limited technical risk indicators\n"
+    
+    analysis += "\n## Outlook\n"
+    if recommendation == "BUY":
+        analysis += "Technical indicators suggest potential upside. Consider position sizing appropriately."
+    elif recommendation == "SELL":
+        analysis += "Technical indicators suggest potential downside. Consider risk management."
+    else:
+        analysis += "Mixed technical signals. Wait for clearer direction before taking action."
+    
+    return analysis
 
 def add_position(position: Dict, user_id: int = None) -> None:
     """Add a position to the portfolio"""

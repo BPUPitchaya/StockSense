@@ -92,7 +92,12 @@ class _SignupScreenState extends State<SignupScreen> {
       if (mounted) {
         setState(() {
           isLoading = false;
-          errorMessage = e.toString();
+          // Remove "Exception: " prefix if present
+          String error = e.toString();
+          if (error.startsWith('Exception: ')) {
+            error = error.substring(11);
+          }
+          errorMessage = error;
         });
       }
     }
