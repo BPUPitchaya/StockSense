@@ -229,8 +229,8 @@ def verify_jwt_token(authorization: str = Header(...)) -> dict:
 class SignupRequest(BaseModel):
     email: str
     password: str
-    first_name: str = None
-    last_name: str = None
+    first_name: str
+    last_name: str
 
 class LoginRequest(BaseModel):
     email: str

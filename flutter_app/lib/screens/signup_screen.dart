@@ -18,6 +18,25 @@ class _SignupScreenState extends State<SignupScreen> {
   String? errorMessage;
 
   Future<void> _signup() async {
+    // Required field validation
+    if (_firstNameController.text.trim().isEmpty) {
+      setState(() {
+        errorMessage = 'First name is required';
+      });
+      return;
+    }
+    if (_lastNameController.text.trim().isEmpty) {
+      setState(() {
+        errorMessage = 'Last name is required';
+      });
+      return;
+    }
+    if (_emailController.text.trim().isEmpty) {
+      setState(() {
+        errorMessage = 'Email is required';
+      });
+      return;
+    }
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
         errorMessage = 'Passwords do not match';
