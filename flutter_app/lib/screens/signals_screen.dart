@@ -7,6 +7,7 @@ import '../services/currency_service.dart';
 import '../utils/responsive.dart';
 import '../theme.dart';
 import 'stock_detail_screen.dart';
+import 'stock_comparison_screen.dart';
 
 class SignalsScreen extends StatefulWidget {
   const SignalsScreen({super.key});
@@ -25,6 +26,9 @@ class _SignalsScreenState extends State<SignalsScreen> {
   List<String> personalWatchlist = [];
   Map<String, bool> inWatchlist = {};
   Map<String, dynamic>? marketStatus;
+  List<Map<String, dynamic>> marketNews = [];
+  bool isLoadingNews = false;
+  final Set<String> _expandedNewsIds = {};
   
   @override
   void initState() {
@@ -32,6 +36,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
     _loadAll();
     _loadPersonalWatchlist();
     _loadMarketStatus();
+    _loadMarketNews();
   }
 
   Future<void> _loadAll() async {
@@ -131,6 +136,24 @@ class _SignalsScreenState extends State<SignalsScreen> {
       }
     } catch (e) {
       // Silently fail - market status is optional
+    }
+  }
+
+  Future<void> _loadMarketNews() async {
+    setState(() { isLoadingNews = true; });
+    try {
+      final news = await ApiService.getMarketNews();
+      if (mounted) {
+        setState(() {
+          marketNews = news;
+          isLoadingNews = false;
+        });
+      }
+    } catch (e) {
+      // Silently fail - news is optional
+      if (mounted) {
+        setState(() { isLoadingNews = false; });
+      }
     }
   }
 
@@ -316,6 +339,16 @@ class _SignalsScreenState extends State<SignalsScreen> {
               )
             : null,
         actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.compare_arrows, size: 20),
+            label: const Text('Compare'),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StockComparisonScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(
               marketStatus != null && marketStatus!['is_open'] ? Icons.wb_sunny : Icons.nights_stay,
@@ -367,6 +400,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
         ),
       ),
       body: ResponsiveBody(
+        maxWidth: 1400,
         child: isSearching
             ? const Center(child: CircularProgressIndicator())
             : searchedSignal != null
@@ -393,16 +427,230 @@ class _SignalsScreenState extends State<SignalsScreen> {
                                 title: 'No signals available',
                                 subtitle: 'Pull down to refresh or search for a stock above.',
                               )
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                itemCount: signals.length,
-                                itemBuilder: (context, index) {
-                                  final signal = signals[index];
-                                  return _buildSignalCard(signal);
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isWide = constraints.maxWidth >= 650;
+                                  if (isWide) {
+                                    return _buildWideLayout(constraints.maxWidth);
+                                  } else {
+                                    return _buildNarrowLayout();
+                                  }
                                 },
                               ),
       ),
     ));
+  }
+
+  // Wide layout: stocks left, news right (Yahoo Finance style)
+  Widget _buildWideLayout(double totalWidth) {
+    final cs = Theme.of(context).colorScheme;
+    // On very wide screens give more space to stocks
+    final stocksFlex = totalWidth > 1100 ? 4 : 3;
+    final newsFlex = totalWidth > 1100 ? 2 : 2;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: stock signals
+        Expanded(
+          flex: stocksFlex,
+          child: ListView.builder(
+            padding: const EdgeInsets.only(top: 6, bottom: 16),
+            itemCount: signals.length,
+            itemBuilder: (context, index) => _buildSignalCard(signals[index]),
+          ),
+        ),
+        // Divider
+        VerticalDivider(width: 1, color: cs.onSurface.withOpacity(0.08)),
+        // Right: news
+        Expanded(
+          flex: newsFlex,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'MARKET NEWS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withOpacity(0.4),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              isLoadingNews
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        itemCount: marketNews.length,
+                        itemBuilder: (context, index) => _buildNewsCard(marketNews[index]),
+                      ),
+                    ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Narrow layout: stocks then news stacked (mobile)
+  Widget _buildNarrowLayout() {
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
+      itemCount: signals.length + (marketNews.isNotEmpty || isLoadingNews ? marketNews.length + 1 : 0),
+      itemBuilder: (context, index) {
+        if (index < signals.length) {
+          return _buildSignalCard(signals[index]);
+        }
+        final newsIndex = index - signals.length;
+        if (newsIndex == 0) return _buildNewsSectionHeader();
+        return _buildNewsCard(marketNews[newsIndex - 1]);
+      },
+    );
+  }
+
+  Widget _buildNewsSectionHeader() {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Text(
+            'Market News',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withOpacity(0.45),
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Divider(color: cs.onSurface.withOpacity(0.1))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewsCard(Map<String, dynamic> newsItem) {
+    final cs = Theme.of(context).colorScheme;
+    final source = newsItem['source'] as String? ?? '';
+    final summary = newsItem['summary'] as String? ?? '';
+    final newsId = newsItem['id']?.toString() ?? newsItem['headline'] ?? '';
+    final isExpanded = _expandedNewsIds.contains(newsId);
+    final cleanSummary = summary.replaceAll(RegExp(r'https?://\S+'), '').trim();
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isExpanded) {
+            _expandedNewsIds.remove(newsId);
+          } else {
+            _expandedNewsIds.add(newsId);
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        newsItem['headline'] ?? '',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: cs.onSurface,
+                          height: 1.4,
+                        ),
+                        maxLines: isExpanded ? null : 2,
+                        overflow: isExpanded ? null : TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            source,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.primary.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '  ·  ${_formatNewsTime(newsItem['datetime'])}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withOpacity(0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: cs.onSurface.withOpacity(0.3),
+                ),
+              ],
+            ),
+            if (isExpanded && cleanSummary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                cleanSummary,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withOpacity(0.7),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatNewsTime(dynamic datetime) {
+    if (datetime == null) return '';
+    try {
+      DateTime dt;
+      if (datetime is int) {
+        // Unix timestamp in seconds
+        dt = DateTime.fromMillisecondsSinceEpoch(datetime * 1000);
+      } else if (datetime is String) {
+        dt = DateTime.parse(datetime);
+      } else {
+        return '';
+      }
+      
+      final now = DateTime.now();
+      final difference = now.difference(dt);
+      
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h ago';
+      } else {
+        return '${difference.inDays}d ago';
+      }
+    } catch (e) {
+      return '';
+    }
   }
 
   Widget _buildSignalCard(Signal signal) {

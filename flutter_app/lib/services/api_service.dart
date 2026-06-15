@@ -26,23 +26,30 @@ class ApiService {
 
   // Authentication
   static Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'email': email, 'password': password}),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'password': password}),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      await _saveToken(data['access_token']);
-      return data;
-    } else {
-      try {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['detail'] ?? 'Login failed');
-      } catch (e) {
-        throw Exception('Login failed');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        await _saveToken(data['access_token']);
+        return data;
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(errorData['detail'] ?? 'Invalid email or password');
+        } catch (e) {
+          throw Exception('Invalid email or password');
+        }
       }
+    } catch (e) {
+      if (e.toString().contains('Connection refused') || e.toString().contains('ClientException')) {
+        throw Exception('Cannot connect to server. Check your internet and try again.');
+      }
+      rethrow;
     }
   }
 
@@ -69,13 +76,13 @@ class ApiService {
     } else {
       try {
         final errorData = json.decode(response.body);
-        final errorMessage = errorData['detail'] ?? 'Signup failed';
+        final errorMessage = errorData['detail'] ?? 'Could not create account';
         throw Exception(errorMessage);
       } catch (e) {
         if (e is Exception) {
           rethrow;
         }
-        throw Exception('Signup failed');
+        throw Exception('Could not create account');
       }
     }
   }
@@ -112,6 +119,27 @@ class ApiService {
     await _removeToken();
   }
 
+  static Future<List<Map<String, dynamic>>> getMarketNews() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/market-news'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data['news'] ?? []);
+      } else {
+        throw Exception('Could not load news');
+      }
+    } catch (e) {
+      if (e.toString().contains('Connection refused') || e.toString().contains('ClientException')) {
+        throw Exception('Cannot connect to server. Check your internet and try again.');
+      }
+      rethrow;
+    }
+  }
+
   // Admin methods
   static Future<Map<String, dynamic>> adminLogin(String email, String password) async {
     final response = await http.post(
@@ -123,7 +151,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Admin login failed: ${response.body}');
+      throw Exception('Invalid admin credentials');
     }
   }
 

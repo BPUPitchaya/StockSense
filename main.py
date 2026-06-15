@@ -177,13 +177,7 @@ app.add_middleware(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://stocksense-h0n6.onrender.com",
-        "https://stock-sense-wheat.vercel.app",
-        "https://stock-sense-*.vercel.app",  # Allow all Vercel preview deployments
-        "http://localhost:8080",
-        "http://127.0.0.1:8080"
-    ],
+    allow_origins=["*"],  # Allow all origins for local development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1117,20 +1111,50 @@ def search_stock(ticker: str):
         raise HTTPException(status_code=404, detail="Ticker not found")
     
     # For US stocks, use Finnhub
+
+@app.get("/market-news")
+@limiter.limit("30/minute")
+def get_market_news(request: Request):
+    """Get general market news from Finnhub"""
     try:
-        stock_info = signals.get_stock_info_finnhub(ticker)
-        if stock_info:
-            technicals = signals.get_technical_indicators(ticker)
-            stock_info['ma50'] = technicals.get('ma50')
-            stock_info['ma200'] = technicals.get('ma200')
-            stock_info['volume_ratio'] = technicals.get('volume_ratio')
-            return stock_info
+        cache_key = "market_news_v1"
+        
+        # Check Redis cache first
+        if signals.redis_client:
+            try:
+                cached = signals.redis_client.get(cache_key)
+                if cached:
+                    print("Using cached market news")
+                    return json.loads(cached)
+            except Exception as e:
+                print(f"Redis cache read failed: {e}")
+        
+        # Fetch from Finnhub using direct API call
+        import requests
+        news_url = f"https://finnhub.io/api/v1/news?category=general&token={signals.FINNHUB_API_KEY}"
+        response = requests.get(news_url, timeout=10)
+        if response.status_code == 200:
+            news = response.json()
         else:
-            raise HTTPException(status_code=404, detail="Stock not found. For NZ stocks use ticker.NZ (e.g. AIR.NZ), for AU use ticker.AX (e.g. CBA.AX)")
-    except HTTPException:
-        raise
+            news = []
+        
+        if not news:
+            return {"news": []}
+        
+        # Limit to top 5 news items
+        limited_news = news[:5]
+        
+        # Cache for 10 minutes
+        if signals.redis_client:
+            try:
+                signals.redis_client.setex(cache_key, 600, json.dumps(limited_news))
+            except Exception as e:
+                print(f"Redis cache write failed: {e}")
+        
+        return {"news": limited_news}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error fetching market news: {e}")
+        return {"news": []}
 
 @app.get("/validate-stock/{ticker}")
 def validate_stock(ticker: str):
