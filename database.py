@@ -958,8 +958,9 @@ def get_prediction_accuracy_statistics() -> Dict:
         total_checked = len(checked_predictions)
         
         if total_checked == 0:
+            total = session.query(PredictionHistory).count()
             return {
-                'total_predictions': 0,
+                'total_predictions': total,
                 'checked_predictions': 0,
                 'correct_direction_count': 0,
                 'direction_accuracy': 0.0,
