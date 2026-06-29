@@ -716,6 +716,22 @@ def get_public_prediction_accuracy():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/debug/db")
+def debug_db():
+    """Debug endpoint to check database connection"""
+    import os
+    db_url = os.getenv('DATABASE_URL', 'NOT SET')
+    # Mask password
+    if '://' in db_url:
+        parts = db_url.split('@')
+        if len(parts) > 1:
+            db_url = parts[0].split(':')[0] + ':***@' + parts[1]
+    return {
+        "database_url": db_url,
+        "engine_url": str(database.engine.url).split('@')[0].split(':')[0] + '@***',
+        "prediction_count": database.SessionLocal().query(database.PredictionHistory).count()
+    }
+
 @app.get("/admin/feedback")
 def get_all_feedback():
     """Get all user feedback (admin only)"""
