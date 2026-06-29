@@ -839,9 +839,17 @@ def set_user_currency(user_id: int, currency: str) -> bool:
         session.close()
 
 def save_prediction(ticker: str, signal: str, current_price: float, predicted_direction: str, days_forward: int = 10) -> int:
-    """Save a prediction to track accuracy later"""
+    """Save a prediction to track accuracy later (dedup: skip if same ticker predicted in last 24h)"""
     session = SessionLocal()
     try:
+        from datetime import timedelta
+        recent = session.query(PredictionHistory).filter(
+            PredictionHistory.ticker == ticker,
+            PredictionHistory.prediction_date >= datetime.utcnow() - timedelta(hours=24)
+        ).first()
+        if recent:
+            return recent.id
+
         prediction = PredictionHistory(
             ticker=ticker,
             signal=signal,

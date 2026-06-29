@@ -866,6 +866,17 @@ def get_predictions(request: Request, category: Optional[str] = None, authorizat
             sorted_signals = sorted(cached_signals, key=lambda x: x.get('percent_change', 0), reverse=True)
             all_predictions = convert_signals_to_predictions(sorted_signals)
             
+            # Save predictions for accuracy tracking (dedup handles duplicates)
+            for pred in all_predictions:
+                signal_upper = pred.get('signal', '').upper()
+                direction = 'up' if 'BUY' in signal_upper else 'down' if 'SELL' in signal_upper else 'flat'
+                database.save_prediction(
+                    ticker=pred['ticker'],
+                    signal=pred['signal'],
+                    current_price=pred['current_price'],
+                    predicted_direction=direction
+                )
+            
             # Separate gainers (positive change) and losers (negative change)
             gainers = [p for p in all_predictions if p.get('percent_change', 0) > 0][:3]
             losers = [p for p in all_predictions if p.get('percent_change', 0) < 0][-3:]
