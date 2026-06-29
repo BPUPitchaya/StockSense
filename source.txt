@@ -1,0 +1,84 @@
+to run all 
+./start-all.sh
+
+to run on mobile
+#backend 
+lsof -ti:8000 | xargs kill -9
+HOST=0.0.0.0 ./start.sh
+
+#frontend
+cd flutter_app/build/web
+python3 -m http.server 8080
+
+# For phone:
+
+Open Settings tab in the app
+Change API URL to: http://172.20.10.9:8000 (your laptop IP)
+Save settings
+Start backend with: HOST=0.0.0.0 ./start.sh
+Serve web app: cd flutter_app/build/web && python3 -m http.server 8080
+Access from phone: http://172.20.10.9:8080
+
+# To switch back to laptop:
+
+Go to Settings
+Change URL back to: http://localhost:8000
+Save
+
+#backend local
+cd /Users/bpu/Documents/Projects/Stockz
+HOST=0.0.0.0 ./start.sh
+
+#Rebuild flutter
+cd /Users/bpu/Documents/Projects/Stockz/flutter_app
+flutter build web
+
+#frontend Local
+cd /Users/bpu/Documents/Projects/Stockz/flutter_app/build/web
+python3 -m http.server 8080
+
+Running local for ai use 
+flutter run --dart-define=GEMINI_API_KEY=AIzaSyAk4_kKgDKvQzdxJMkwjA-ofJAaVcCWHQ4
+flutter build web --dart-define=GEMINI_API_KEY=AIzaSyAk4_kKgDKvQzdxJMkwjA-ofJAaVcCWHQ4
+cd /Users/bpu/Documents/Projects/Stockz/flutter_app/build/web && python3 -m http.server 8080
+http://localhost:8080/
+
+https://stocksense-h0n6.onrender.com
+
+#Indicators 
+Daily % Change
+Price vs open 
+price vs previous close
+position in daily range
+MA 50 position
+MA 200 position
+Golden/Death Cross
+volume Confirmation 
+
+#Future Improvement 
+order flow
+volume profile 
+standard moving average 
+
+
+#AI FallBack 
+First Choice (500 RPD): 'gemini-3.1-flash-lite'
+Fallback 1 (20 RPD): 'gemini-3.5-flash'
+Fallback 2 (20 RPD): 'gemini-2.5-flash-lite'
+Fallback 3 (20 RPD): 'gemini-2.5-flash'
+
+
+
+cd /Users/bpu/Documents/Projects/Stockz/flutter_app
+flutter build web --dart-define=GEMINI_API_KEY=AIzaSyAk4_kKgDKvQzdxJMkwjA-ofJAaVcCWHQ4
+
+
+lsof -ti:8080 | xargs kill -9
+cd /Users/bpu/Documents/Projects/Stockz/flutter_app/build/web
+python3 -m http.server 8080
+
+curl https://stocksense-h0n6.onrender.com/health
+
+cd flutter_app && flutter run -d chrome
+
+

@@ -31,6 +31,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   bool _isLoadingAi = false;
   DateTime? _buyDate;
   bool _useTotalAmount = false;
+  List<dynamic> _portfolio = [];
+  bool _ownsStock = false;
 
   // Chart line visibility toggles
   bool _showPrice = true;
@@ -105,6 +107,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     super.initState();
     _loadData();
     _loadPersonalWatchlist();
+    _loadPortfolio();
     CurrencyService.load().then((_) { if (mounted) setState(() {}); });
   }
 
@@ -160,6 +163,20 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       }
     } catch (e) {
       // Silently fail - personal watchlist is optional
+    }
+  }
+
+  Future<void> _loadPortfolio() async {
+    try {
+      final portfolio = await ApiService.getPortfolio();
+      if (mounted) {
+        setState(() {
+          _portfolio = portfolio;
+          _ownsStock = portfolio.any((pos) => pos['ticker'] == widget.signal.ticker);
+        });
+      }
+    } catch (e) {
+      // Silently fail - portfolio is optional
     }
   }
 
@@ -703,9 +720,25 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final prices = historicalData.map((d) => d.close).toList();
     final rawMin = prices.reduce((a, b) => a < b ? a : b);
     final rawMax = prices.reduce((a, b) => a > b ? a : b);
-    final padding = (rawMax - rawMin) * 0.1;
-    final minY = rawMin - padding;
-    final maxY = rawMax + padding;
+    
+    // Include projection prices in Y-axis range calculation
+    final projectionPrices = <double>[];
+    if (_projectionData != null) {
+      final projection = _projectionData!['projection'] as List<dynamic>?;
+      if (projection != null) {
+        for (var point in projection) {
+          final price = point['price'] as double;
+          projectionPrices.add(price);
+        }
+      }
+    }
+    
+    final allPrices = [...prices, ...projectionPrices];
+    final allMin = allPrices.reduce((a, b) => a < b ? a : b);
+    final allMax = allPrices.reduce((a, b) => a > b ? a : b);
+    final padding = (allMax - allMin) * 0.1;
+    final minY = allMin - padding;
+    final maxY = allMax + padding;
     final yRange = maxY - minY;
 
     // Show ~4 evenly spaced labels on Y axis
@@ -1199,7 +1232,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
         'industry': stockInfo?['industry'],
         'market_cap': stockInfo?['market_cap'],
       };
-      final result = await GeminiService.getStockEvaluation(widget.signal.ticker, metrics);
+      final result = await GeminiService.getStockEvaluation(widget.signal.ticker, metrics, ownsStock: _ownsStock);
       if (mounted) setState(() => _aiAnalysis = result);
     } catch (e) {
       if (mounted) setState(() => _aiAnalysis = 'Error: ${e.toString()}');

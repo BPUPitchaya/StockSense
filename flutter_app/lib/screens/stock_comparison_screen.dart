@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../models/signal.dart';
 import '../services/api_service.dart';
 import '../services/currency_service.dart';
@@ -36,24 +34,14 @@ class _StockComparisonScreenState extends State<StockComparisonScreen> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/stocks/available'),
-        headers: await ApiService._getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final signals = data.map((json) => Signal.fromJson(json)).toList();
-        
-        if (mounted) {
-          setState(() {
-            availableStocks = signals;
-            filteredStocks = signals;
-            isLoading = false;
-          });
-        }
-      } else {
-        throw Exception('Failed to load stocks');
+      final signals = await ApiService.getAvailableStocks();
+      
+      if (mounted) {
+        setState(() {
+          availableStocks = signals;
+          filteredStocks = signals;
+          isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -109,6 +97,7 @@ class _StockComparisonScreenState extends State<StockComparisonScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? DarkColors.bg : AppColors.bg,
       appBar: AppBar(
         title: const Text('Compare Stocks'),
         actions: [
@@ -170,74 +159,76 @@ class _StockComparisonScreenState extends State<StockComparisonScreen> {
       );
     }
 
-    return Column(
-      children: [
-        // Search bar
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? DarkColors.surface : AppColors.surface,
-            border: Border(
-              bottom: BorderSide(color: isDark ? DarkColors.border : AppColors.border),
-            ),
-          ),
-          child: TextField(
-            controller: _searchController,
-            onChanged: _filterStocks,
-            decoration: InputDecoration(
-              hintText: 'Search stocks...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _hasSearchText
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _filterStocks('');
-                      },
-                    )
-                  : null,
-            ),
-          ),
-        ),
-        // Selection summary
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? DarkColors.surface : AppColors.surface,
-            border: Border(
-              bottom: BorderSide(color: isDark ? DarkColors.border : AppColors.border),
-            ),
-          ),
-          child: Row(
-            children: [
-              Text(
-                'Selected: ${selectedStocks.length}/4',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? DarkColors.text : AppColors.text,
-                ),
-              ),
-              const Spacer(),
-              if (selectedStocks.isNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      selectedStocks.clear();
-                    });
-                  },
-                  child: const Text('Clear All'),
-                ),
-            ],
-          ),
-        ),
-        // Stock list
-        Expanded(
-          child: ListView.builder(
+    return Container(
+      color: isDark ? DarkColors.bg : AppColors.bg,
+      child: Column(
+        children: [
+          // Search bar
+          Container(
             padding: const EdgeInsets.all(16),
-            itemCount: filteredStocks.length,
-            itemBuilder: (context, index) {
-              final stock = filteredStocks[index];
-              final isSelected = selectedStocks.contains(stock);
+            decoration: BoxDecoration(
+              color: isDark ? DarkColors.surface : AppColors.surface,
+              border: Border(
+                bottom: BorderSide(color: isDark ? DarkColors.border : AppColors.border),
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterStocks,
+              decoration: InputDecoration(
+                hintText: 'Search stocks...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _hasSearchText
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filterStocks('');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          // Selection summary
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? DarkColors.surface : AppColors.surface,
+              border: Border(
+                bottom: BorderSide(color: isDark ? DarkColors.border : AppColors.border),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Selected: ${selectedStocks.length}/4',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? DarkColors.text : AppColors.text,
+                  ),
+                ),
+                const Spacer(),
+                if (selectedStocks.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        selectedStocks.clear();
+                      });
+                    },
+                    child: const Text('Clear All'),
+                  ),
+              ],
+            ),
+          ),
+          // Stock list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: filteredStocks.length,
+              itemBuilder: (context, index) {
+                final stock = filteredStocks[index];
+                final isSelected = selectedStocks.contains(stock);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -273,7 +264,7 @@ class _StockComparisonScreenState extends State<StockComparisonScreen> {
                       child: isSelected
                           ? const Icon(Icons.check, color: Colors.white, size: 20)
                           : Text(
-                              stock.ticker.substring(0, 2),
+                              stock.ticker.length >= 2 ? stock.ticker.substring(0, 2) : stock.ticker,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: isDark ? DarkColors.text : AppColors.text,
@@ -316,7 +307,8 @@ class _StockComparisonScreenState extends State<StockComparisonScreen> {
             },
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 

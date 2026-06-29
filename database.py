@@ -104,7 +104,7 @@ class PredictionHistory(Base):
     current_price = Column(Float, nullable=False)  # Price when prediction made
     predicted_direction = Column(String, nullable=False)  # up, down, flat
     prediction_date = Column(DateTime, default=datetime.utcnow)
-    target_date = Column(DateTime, nullable=False)  # 30 days forward
+    target_date = Column(DateTime, nullable=False)  # 10 days forward
     actual_price = Column(Float, nullable=True)  # Filled in later
     accuracy_percent = Column(Float, nullable=True)  # Calculated when target_date reached
     is_correct = Column(Boolean, nullable=True)  # True if direction matched
@@ -838,7 +838,7 @@ def set_user_currency(user_id: int, currency: str) -> bool:
     finally:
         session.close()
 
-def save_prediction(ticker: str, signal: str, current_price: float, predicted_direction: str, days_forward: int = 30) -> int:
+def save_prediction(ticker: str, signal: str, current_price: float, predicted_direction: str, days_forward: int = 10) -> int:
     """Save a prediction to track accuracy later"""
     session = SessionLocal()
     try:
@@ -903,7 +903,7 @@ def update_prediction_accuracy(prediction_id: int, actual_price: float) -> bool:
         
         # Calculate accuracy percentage (0-100% based on how close the magnitude was)
         if prediction.current_price > 0:
-            predicted_change = 0.002 * 30 if prediction.predicted_direction == 'up' else -0.002 * 30 if prediction.predicted_direction == 'down' else 0
+            predicted_change = 0.002 * 10 if prediction.predicted_direction == 'up' else -0.002 * 10 if prediction.predicted_direction == 'down' else 0
             predicted_price = prediction.current_price * (1 + predicted_change)
             if predicted_price > 0:
                 error_ratio = abs(actual_price - predicted_price) / predicted_price

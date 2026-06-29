@@ -1253,7 +1253,7 @@ def get_projection(ticker: str, period: str = "1y"):
         # Score range typically -7 to +5, map to -0.7% to +0.5% daily
         daily_change = (score / 10) * 0.01  # Max 0.7% daily change down, 0.5% up
         
-        # Calculate projection for next 30 days
+        # Calculate projection for next 10 days
         projection = []
         last_price = current_price
         

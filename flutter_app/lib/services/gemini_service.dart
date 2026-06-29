@@ -5,9 +5,11 @@ import 'api_service.dart';
 class GeminiService {
   static Future<String> getStockEvaluation(String ticker, Map<String, dynamic> metrics, {bool ownsStock = false}) async {
     try {
+      final headers = {'Content-Type': 'application/json'};
+      
       final response = await http.post(
         Uri.parse('${ApiService.baseUrl}/ai-analysis'),
-        headers: await ApiService._getHeaders(),
+        headers: headers,
         body: json.encode({
           'ticker': ticker,
           'owns_stock': ownsStock,

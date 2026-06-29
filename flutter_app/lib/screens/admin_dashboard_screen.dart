@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stockz_app/services/api_service.dart';
 import '../config.dart';
@@ -18,18 +19,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String? _errorMessage;
   final TextEditingController _apiUrlController = TextEditingController();
   int _selectedIndex = 0;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _apiUrlController.text = Config.apiBaseUrl;
     _loadData();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
     _apiUrlController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
 
   void _saveApiSettings() {
@@ -38,7 +50,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ApiService.baseUrl = Config.apiBaseUrl;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('API URL updated. Changes take effect immediately.')),
+      SnackBar(
+        content: Text(
+          'API URL updated. Changes take effect immediately.',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+          ),
+        ),
+      ),
     );
   }
 
@@ -91,13 +112,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _loadData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User deleted successfully')),
+            SnackBar(
+              content: Text(
+                'User deleted successfully',
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                ),
+              ),
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete user: $e')),
+            SnackBar(
+              content: Text(
+                'Failed to delete user: $e',
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                ),
+              ),
+            ),
           );
         }
       }
