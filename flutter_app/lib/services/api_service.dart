@@ -454,6 +454,15 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getPredictionAccuracy() async {
+    final response = await http.get(Uri.parse('$baseUrl/prediction-accuracy'));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to get prediction accuracy: ${response.body}');
+    }
+  }
+
   static Future<Map<String, dynamic>> getProjection(String ticker, String period) async {
     final response = await http.get(Uri.parse('$baseUrl/projection/$ticker?period=$period'));
     if (response.statusCode == 200) {

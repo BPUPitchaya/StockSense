@@ -19,13 +19,34 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   List<String> personalWatchlist = [];
   bool isLoadingWatchlist = false;
   TextEditingController tickerController = TextEditingController();
+  Map<String, dynamic> accuracyData = {};
+  bool isLoadingAccuracy = true;
 
   @override
   void initState() {
     super.initState();
     _loadPredictions();
     _loadPersonalWatchlist();
+    _loadAccuracy();
     CurrencyService.load().then((_) { if (mounted) setState(() {}); });
+  }
+
+  Future<void> _loadAccuracy() async {
+    try {
+      final data = await ApiService.getPredictionAccuracy();
+      if (mounted) {
+        setState(() {
+          accuracyData = data;
+          isLoadingAccuracy = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingAccuracy = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadPredictions() async {
@@ -205,9 +226,13 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                     ],
                   )
                 : RefreshIndicator(
-                    onRefresh: _loadPredictions,
+                    onRefresh: () async {
+                      await _loadPredictions();
+                      await _loadAccuracy();
+                    },
                     child: ListView(
                       children: [
+                        _buildAccuracyDashboard(),
                         _buildPersonalWatchlistSection(),
                         _buildGainersSection(),
                         _buildLosersSection(),
@@ -217,6 +242,216 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   ),
       ),
     );
+  }
+
+  Widget _buildAccuracyDashboard() {
+    if (isLoadingAccuracy) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final totalPredictions = accuracyData['total_predictions'] ?? 0;
+    final checkedPredictions = accuracyData['checked_predictions'] ?? 0;
+    final correctCount = accuracyData['correct_direction_count'] ?? 0;
+    final directionAccuracy = (accuracyData['direction_accuracy'] ?? 0.0).toDouble();
+    final avgAccuracy = (accuracyData['average_accuracy_percent'] ?? 0.0).toDouble();
+    final byTicker = (accuracyData['by_ticker'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+
+    if (checkedPredictions == 0) {
+      return Card(
+        margin: const EdgeInsets.all(16),
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Icon(Icons.insights, size: 40, color: Colors.blue.shade300),
+              const SizedBox(height: 12),
+              const Text(
+                'AI Accuracy Tracking',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$totalPredictions predictions are being tracked.\nAccuracy results will appear after the 10-day evaluation period.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                value: totalPredictions > 0 ? 1.0 : 0.0,
+                backgroundColor: Colors.grey.shade300,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade400),
+                minHeight: 6,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$totalPredictions predictions awaiting evaluation',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights, color: Colors.blue.shade700, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'AI Prediction Accuracy',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildAccuracyMetric(
+                    'Direction Accuracy',
+                    '${directionAccuracy.toStringAsFixed(1)}%',
+                    _getAccuracyColor(directionAccuracy),
+                    '$correctCount / $checkedPredictions correct',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAccuracyMetric(
+                    'Price Accuracy',
+                    '${avgAccuracy.toStringAsFixed(1)}%',
+                    _getAccuracyColor(avgAccuracy),
+                    'Avg. closeness',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: directionAccuracy / 100,
+                backgroundColor: Colors.grey.shade300,
+                valueColor: AlwaysStoppedAnimation<Color>(_getAccuracyColor(directionAccuracy)),
+                minHeight: 10,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Based on $checkedPredictions evaluated predictions out of $totalPredictions total',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+            if (byTicker.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Accuracy by Stock',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...byTicker.take(5).map((t) => _buildTickerAccuracyRow(t)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccuracyMetric(String label, String value, Color color, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTickerAccuracyRow(Map<String, dynamic> tickerData) {
+    final ticker = tickerData['ticker'] ?? '';
+    final total = tickerData['total_predictions'] ?? 0;
+    final correct = tickerData['correct_predictions'] ?? 0;
+    final accuracy = (tickerData['accuracy_percent'] ?? 0.0).toDouble();
+    final color = _getAccuracyColor(accuracy);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 60,
+            child: Text(
+              ticker,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: accuracy / 100,
+                backgroundColor: Colors.grey.shade300,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 8,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 50,
+            child: Text(
+              '${accuracy.toStringAsFixed(0)}%',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 50,
+            child: Text(
+              '$correct/$total',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getAccuracyColor(double accuracy) {
+    if (accuracy >= 70) return Colors.green;
+    if (accuracy >= 50) return Colors.orange;
+    return Colors.red;
   }
 
   Widget _buildPersonalWatchlistSection() {
