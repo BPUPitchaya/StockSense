@@ -802,45 +802,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   void _showPredictionDetails(Map<String, dynamic> prediction) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${prediction['ticker']} Details'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Prediction: ${prediction['prediction']}'),
-              Text('Confidence: ${prediction['confidence']}%'),
-              Text('Score: ${prediction['score'].toStringAsFixed(2)}'),
-              Text('Trend Strength: ${prediction['trend_strength'] ?? 'Unknown'}'),
-              if (prediction['adx'] != null)
-                Text('ADX: ${prediction['adx'].toStringAsFixed(2)}'),
-              const SizedBox(height: 16),
-              const Text(
-                'All Factors:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...(prediction['factors'] as List).map((factor) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('• '),
-                        Expanded(child: Text(factor)),
-                      ],
-                    ),
-                  )),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      builder: (context) => _PredictionDetailDialog(prediction: prediction),
     );
   }
 
@@ -916,5 +878,303 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
         ),
       ],
     );
+  }
+}
+
+class _PredictionDetailDialog extends StatefulWidget {
+  final Map<String, dynamic> prediction;
+
+  const _PredictionDetailDialog({required this.prediction});
+
+  @override
+  State<_PredictionDetailDialog> createState() => _PredictionDetailDialogState();
+}
+
+class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
+  List<Map<String, dynamic>> history = [];
+  bool isLoadingHistory = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final ticker = widget.prediction['ticker'];
+      final data = await ApiService.getPredictionHistory(ticker);
+      if (mounted) {
+        setState(() {
+          history = data;
+          isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingHistory = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prediction = widget.prediction;
+    final predictionText = prediction['prediction'].toString();
+    final confidence = (prediction['confidence'] as num).toInt();
+    final trendStrength = prediction['trend_strength']?.toString() ?? 'Unknown';
+    final currentPrice = (prediction['current_price'] as num).toDouble();
+    final potentialChange = (prediction['potential_change'] as num).toDouble();
+
+    // Calculate predicted price (2% over 10 days in predicted direction)
+    final predictedPrice = potentialChange > 0
+        ? currentPrice * 1.02
+        : potentialChange < 0
+            ? currentPrice * 0.98
+            : currentPrice;
+
+    return AlertDialog(
+      title: Text('${prediction['ticker']} Details'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Current prediction summary
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Signal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getPredictionColor(predictionText),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          predictionText,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _buildPriceRow('Current Price', CurrencyService.format(currentPrice), Colors.grey.shade700),
+                  const SizedBox(height: 6),
+                  _buildPriceRow(
+                    'Predicted Price (10d)',
+                    CurrencyService.format(predictedPrice),
+                    potentialChange > 0 ? Colors.green : potentialChange < 0 ? Colors.red : Colors.grey,
+                  ),
+                  const SizedBox(height: 6),
+                  _buildPriceRow(
+                    'Expected Change',
+                    '${potentialChange > 0 ? '+' : ''}${potentialChange.toStringAsFixed(1)}%',
+                    potentialChange > 0 ? Colors.green : potentialChange < 0 ? Colors.red : Colors.grey,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Confidence: $confidence%'),
+            Text('Score: ${prediction['score'].toStringAsFixed(2)}'),
+            Text('Trend Strength: $trendStrength'),
+            if (prediction['adx'] != null)
+              Text('ADX: ${prediction['adx'].toStringAsFixed(2)}'),
+
+            // Prediction track record
+            const SizedBox(height: 20),
+            const Text(
+              'Prediction Track Record',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            if (isLoadingHistory)
+              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            else if (history.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No past predictions evaluated yet for this stock.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              )
+            else
+              ...history.take(5).map((h) => _buildHistoryRow(h)),
+
+            // All factors
+            const SizedBox(height: 16),
+            const Text(
+              'All Factors:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...(prediction['factors'] as List).map((factor) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• '),
+                      Expanded(child: Text(factor)),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriceRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Text(
+          value,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryRow(Map<String, dynamic> h) {
+    final hasResult = h['actual_price'] != null;
+    final predictedDir = h['predicted_direction'] ?? 'flat';
+    final isCorrect = h['is_correct'] == true;
+    final accuracy = (h['accuracy_percent'] as num?)?.toDouble();
+    final currentPrice = (h['current_price'] as num?)?.toDouble();
+    final actualPrice = (h['actual_price'] as num?)?.toDouble();
+
+    // Calculate predicted price
+    final predictedPrice = currentPrice != null
+        ? predictedDir == 'up'
+            ? currentPrice * 1.02
+            : predictedDir == 'down'
+                ? currentPrice * 0.98
+                : currentPrice
+        : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: hasResult
+            ? (isCorrect ? Colors.green.shade50 : Colors.red.shade50)
+            : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasResult
+              ? (isCorrect ? Colors.green.shade200 : Colors.red.shade200)
+              : Colors.orange.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Predicted: ${predictedDir.toUpperCase()}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              if (hasResult)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isCorrect ? Colors.green : Colors.red,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isCorrect ? 'CORRECT' : 'WRONG',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'PENDING',
+                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (currentPrice != null && predictedPrice != null)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Was: ${CurrencyService.format(currentPrice)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                Text(
+                  'Target: ${CurrencyService.format(predictedPrice)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          if (hasResult && actualPrice != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Actual: ${CurrencyService.format(actualPrice)}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                if (accuracy != null)
+                  Text(
+                    'Accuracy: ${accuracy.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: accuracy >= 70 ? Colors.green : accuracy >= 50 ? Colors.orange : Colors.red,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _getPredictionColor(String prediction) {
+    switch (prediction.toUpperCase()) {
+      case 'STRONG BUY':
+        return Colors.green.shade700;
+      case 'BUY':
+        return Colors.green;
+      case 'STRONG SELL':
+        return Colors.red.shade700;
+      case 'SELL':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }
