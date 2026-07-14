@@ -938,10 +938,12 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
     return AlertDialog(
       title: Text('${prediction['ticker']} Details'),
       content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: DefaultTextStyle(
+          style: const TextStyle(color: Colors.black87),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Current prediction summary
             Container(
               padding: const EdgeInsets.all(12),
@@ -955,7 +957,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Signal', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text('Signal', style: TextStyle(fontSize: 12, color: Colors.black54)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -997,7 +999,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
             const SizedBox(height: 20),
             const Text(
               'Prediction Track Record',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
             ),
             const SizedBox(height: 8),
             if (isLoadingHistory)
@@ -1007,7 +1009,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'No past predictions evaluated yet for this stock.',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  style: TextStyle(color: Colors.black54, fontSize: 13),
                 ),
               )
             else
@@ -1017,7 +1019,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
             const SizedBox(height: 16),
             const Text(
               'All Factors:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             const SizedBox(height: 8),
             ...(prediction['factors'] as List).map((factor) => Padding(
@@ -1026,11 +1028,12 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('• '),
-                      Expanded(child: Text(factor)),
+                      Expanded(child: Text(factor, style: const TextStyle(color: Colors.black87))),
                     ],
                   ),
                 )),
           ],
+        ),
         ),
       ),
       actions: [
@@ -1046,7 +1049,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 13, color: Colors.black54)),
         Text(
           value,
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
@@ -1094,7 +1097,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
             children: [
               Text(
                 'Predicted: ${predictedDir.toUpperCase()}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
               ),
               if (hasResult)
                 Container(
@@ -1129,11 +1132,11 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
               children: [
                 Text(
                   'Was: ${CurrencyService.format(currentPrice)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
                 Text(
                   'Target: ${CurrencyService.format(predictedPrice)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),
@@ -1144,7 +1147,7 @@ class _PredictionDetailDialogState extends State<_PredictionDetailDialog> {
               children: [
                 Text(
                   'Actual: ${CurrencyService.format(actualPrice)}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
                 ),
                 if (accuracy != null)
                   Text(
