@@ -400,6 +400,33 @@ def startup_event():
     curated_thread.start()
     print("Periodic curated stock refresh started (every 30 minutes)")
 
+    # Start periodic prediction accuracy checking (every 30 minutes)
+    def periodic_prediction_accuracy_check():
+        while True:
+            try:
+                due_predictions = database.get_predictions_due_for_check()
+                if due_predictions:
+                    print(f"Periodic check: {len(due_predictions)} due predictions")
+                    for pred in due_predictions:
+                        try:
+                            ticker = pred['ticker']
+                            stock_info = signals.get_stock_info_finnhub(ticker)
+                            if stock_info and stock_info.get('current_price'):
+                                database.update_prediction_accuracy(pred['id'], stock_info['current_price'])
+                                print(f"  Updated accuracy for {ticker}: ${stock_info['current_price']}")
+                            else:
+                                print(f"  No price data for {ticker}")
+                        except Exception as e:
+                            print(f"  Error checking {pred.get('ticker')}: {e}")
+                time.sleep(1800)  # Check every 30 minutes
+            except Exception as e:
+                print(f"Periodic prediction accuracy check error: {e}")
+                time.sleep(1800)
+
+    accuracy_thread = threading.Thread(target=periodic_prediction_accuracy_check, daemon=True)
+    accuracy_thread.start()
+    print("Periodic prediction accuracy checking started (every 30 minutes)")
+
 @app.get("/")
 def read_root():
     return {"message": "StockSense API is running"}
@@ -713,6 +740,33 @@ def get_public_prediction_accuracy():
     try:
         accuracy_stats = database.get_prediction_accuracy_statistics()
         return accuracy_stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/prediction-accuracy/check-now")
+def check_predictions_now():
+    """Manually trigger prediction accuracy check for due predictions"""
+    try:
+        due_predictions = database.get_predictions_due_for_check()
+        updated = 0
+        errors = 0
+        for pred in due_predictions:
+            try:
+                ticker = pred['ticker']
+                stock_info = signals.get_stock_info_finnhub(ticker)
+                if stock_info and stock_info.get('current_price'):
+                    database.update_prediction_accuracy(pred['id'], stock_info['current_price'])
+                    updated += 1
+                else:
+                    errors += 1
+            except Exception as e:
+                print(f"Error checking {pred.get('ticker')}: {e}")
+                errors += 1
+        return {
+            "due": len(due_predictions),
+            "updated": updated,
+            "errors": errors
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
